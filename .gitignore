@@ -1,0 +1,16 @@
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+report.json
+schema.sql
+tmp_data/
+tmp_mixed/
+perf_data/
+perf_outputs/
+html/
+.alchemia_debug/

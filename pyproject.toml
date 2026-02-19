@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.24.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alchemia"
+version = "0.1.0"
+description = "Deterministic relational inference engine for structured datasets."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Alchemia contributors" }]
+dependencies = [
+  "polars>=1.10.0",
+  "pandas>=2.2.0",
+  "openpyxl>=3.1.0",
+  "typer>=0.12.3",
+  "pydantic>=2.8.2",
+  "networkx>=3.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.2",
+  "ruff>=0.6.2",
+  "black>=24.8.0",
+]
+
+[project.scripts]
+alchemia = "alchemia.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
