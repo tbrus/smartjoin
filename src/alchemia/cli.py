@@ -38,6 +38,20 @@ def _parse_weight_assignments(values: list[str]) -> dict[str, float]:
     return parsed
 
 
+def _parse_float_assignments_csv(raw: str | None, label: str) -> dict[str, float]:
+    if raw is None or not raw.strip():
+        return {}
+    chunks = [chunk.strip() for chunk in raw.split(",") if chunk.strip()]
+    pairs = _parse_assignments(chunks, label=label)
+    parsed: dict[str, float] = {}
+    for key, value in pairs.items():
+        try:
+            parsed[key] = float(value)
+        except ValueError as exc:
+            raise typer.BadParameter(f"Invalid numeric {label} value for {key}: {value}") from exc
+    return parsed
+
+
 @app.callback()
 def root() -> None:
     """Top-level CLI group."""
@@ -74,10 +88,36 @@ def analyze_command(
         float,
         typer.Option(min=0.0, max=1.0, help="Minimum confidence threshold for joins."),
     ] = 0.8,
-    graph_top_k_per_pair: Annotated[
+    top_k_edges: Annotated[
         int,
-        typer.Option(min=1, help="Top K join edges retained per table pair in graph output."),
+        typer.Option(
+            "--top-k-edges",
+            "--graph-top-k-per-pair",
+            min=1,
+            help="Top K join edges retained per table pair in graph output.",
+        ),
     ] = 3,
+    distinct_low_card_threshold: Annotated[
+        int,
+        typer.Option(min=1, help="Distinct-count threshold used for low-cardinality trap guard."),
+    ] = 64,
+    near_unique_threshold: Annotated[
+        float,
+        typer.Option(
+            min=0.0,
+            max=1.0,
+            help="Near-unique threshold used in profiling, key seeds, and join pruning.",
+        ),
+    ] = 0.9,
+    date_caps: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Date caps override as comma-separated key=value pairs, e.g. "
+                "'temporal_overlap=0.6,mixed_temporal=0.75'"
+            )
+        ),
+    ] = None,
     fast_profile: Annotated[
         bool,
         typer.Option(help="Enable faster profiling (skips expensive entropy/duplicate scans)."),
@@ -121,7 +161,10 @@ def analyze_command(
         max_tables=max_tables,
         max_columns=max_columns,
         min_confidence=min_confidence,
-        graph_top_k_per_pair=graph_top_k_per_pair,
+        top_k_edges=top_k_edges,
+        distinct_low_card_threshold=distinct_low_card_threshold,
+        near_unique_threshold=near_unique_threshold,
+        date_caps=_parse_float_assignments_csv(date_caps, label="date-caps"),
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
         join_weights=_parse_weight_assignments(join_weight or []),
@@ -151,9 +194,14 @@ def graph_command(
         float,
         typer.Option(min=0.0, max=1.0, help="Minimum confidence threshold for graph edges."),
     ] = 0.8,
-    graph_top_k_per_pair: Annotated[
+    top_k_edges: Annotated[
         int,
-        typer.Option(min=1, help="Top K join edges retained per table pair."),
+        typer.Option(
+            "--top-k-edges",
+            "--graph-top-k-per-pair",
+            min=1,
+            help="Top K join edges retained per table pair.",
+        ),
     ] = 3,
     sample_rows: Annotated[
         int,
@@ -170,6 +218,27 @@ def graph_command(
     max_columns: Annotated[
         int | None,
         typer.Option(min=1, help="Maximum columns per table to consider."),
+    ] = None,
+    distinct_low_card_threshold: Annotated[
+        int,
+        typer.Option(min=1, help="Distinct-count threshold used for low-cardinality trap guard."),
+    ] = 64,
+    near_unique_threshold: Annotated[
+        float,
+        typer.Option(
+            min=0.0,
+            max=1.0,
+            help="Near-unique threshold used in profiling, key seeds, and join pruning.",
+        ),
+    ] = 0.9,
+    date_caps: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Date caps override as comma-separated key=value pairs, e.g. "
+                "'temporal_overlap=0.6,mixed_temporal=0.75'"
+            )
+        ),
     ] = None,
     join_weight: Annotated[
         list[str] | None,
@@ -208,7 +277,10 @@ def graph_command(
         sample_seed=sample_seed,
         max_tables=max_tables,
         max_columns=max_columns,
-        graph_top_k_per_pair=graph_top_k_per_pair,
+        top_k_edges=top_k_edges,
+        distinct_low_card_threshold=distinct_low_card_threshold,
+        near_unique_threshold=near_unique_threshold,
+        date_caps=_parse_float_assignments_csv(date_caps, label="date-caps"),
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
         join_weights=_parse_weight_assignments(join_weight or []),
@@ -299,10 +371,36 @@ def debug_site_command(
         float,
         typer.Option(min=0.0, max=1.0, help="Minimum confidence threshold for relationship lines."),
     ] = 0.75,
-    graph_top_k_per_pair: Annotated[
+    top_k_edges: Annotated[
         int,
-        typer.Option(min=1, help="Top K join edges retained per table pair."),
+        typer.Option(
+            "--top-k-edges",
+            "--graph-top-k-per-pair",
+            min=1,
+            help="Top K join edges retained per table pair.",
+        ),
     ] = 3,
+    distinct_low_card_threshold: Annotated[
+        int,
+        typer.Option(min=1, help="Distinct-count threshold used for low-cardinality trap guard."),
+    ] = 64,
+    near_unique_threshold: Annotated[
+        float,
+        typer.Option(
+            min=0.0,
+            max=1.0,
+            help="Near-unique threshold used in profiling, key seeds, and join pruning.",
+        ),
+    ] = 0.9,
+    date_caps: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Date caps override as comma-separated key=value pairs, e.g. "
+                "'temporal_overlap=0.6,mixed_temporal=0.75'"
+            )
+        ),
+    ] = None,
     join_weight: Annotated[
         list[str] | None,
         typer.Option("--join-weight", help="Override join weight, e.g. jaccard=0.2"),
@@ -342,7 +440,10 @@ def debug_site_command(
         max_tables=max_tables,
         max_columns=max_columns,
         min_confidence=min_confidence,
-        graph_top_k_per_pair=graph_top_k_per_pair,
+        graph_top_k_per_pair=top_k_edges,
+        distinct_low_card_threshold=distinct_low_card_threshold,
+        near_unique_threshold=near_unique_threshold,
+        date_caps=_parse_float_assignments_csv(date_caps, label="date-caps"),
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
         join_weights=_parse_weight_assignments(join_weight or []),

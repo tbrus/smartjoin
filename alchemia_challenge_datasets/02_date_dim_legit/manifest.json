@@ -1,0 +1,50 @@
+{
+  "generator": "bundle/alchemia_challenge_datasets",
+  "generated_at": "2026-02-20T08:53:49Z",
+  "dataset": "02_date_dim_legit",
+  "config": {
+    "profile": "small",
+    "notes": "Legit date dimension join + audit date trap + currency trap."
+  },
+  "row_counts": {
+    "dim_date": 1096,
+    "daily_sales": 1096,
+    "promotions": 90
+  },
+  "expected_joins": [
+    "daily_sales.date_key -> dim_date.date_key"
+  ],
+  "expected_composite_keys": [],
+  "trap_columns": [
+    "created_date",
+    "currency",
+    "is_weekend"
+  ],
+  "ground_truth": {
+    "core_relationships": [
+      {
+        "from_table": "daily_sales",
+        "from_column": "date_key",
+        "to_table": "dim_date",
+        "to_column": "date_key",
+        "relationship": "many_to_one",
+        "dirty_keys_present": false
+      }
+    ],
+    "composite_key_candidates": [],
+    "traps": {
+      "shared_low_cardinality_columns": [
+        "currency",
+        "is_weekend"
+      ],
+      "date_like_columns": [
+        "date",
+        "created_date",
+        "start_date",
+        "end_date"
+      ],
+      "misleading_name_pairs": [],
+      "overlapping_value_traps": []
+    }
+  }
+}

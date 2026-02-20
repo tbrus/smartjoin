@@ -22,6 +22,8 @@ def test_build_join_graph_returns_nodes_and_edges() -> None:
     graph = build_join_graph([customers, orders], joins, min_confidence=0.6)
     report = graph_to_report(graph)
 
+    assert report.top_k_per_pair == 3
+    assert report.min_confidence == 0.6
     assert len(report.nodes) == 2
     assert len(report.edges) >= 1
     assert all(edge.edge_group_id for edge in report.edges)
@@ -68,6 +70,8 @@ def test_build_join_graph_keeps_top_k_alternatives_per_pair() -> None:
     )
     report = graph_to_report(graph)
 
+    assert report.top_k_per_pair == 2
+    assert report.min_confidence == 0.0
     assert len(report.edges) == 2
     assert len({edge.edge_group_id for edge in report.edges}) == 1
     assert sorted(edge.edge_rank for edge in report.edges) == [1, 2]

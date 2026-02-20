@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from alchemia.config import (
+    DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
+    DEFAULT_NEAR_UNIQUE_THRESHOLD,
+    AnalysisSettings,
+    merge_date_caps,
+)
 from alchemia.exporters import build_sql_skeleton
 from alchemia.graphing import build_join_graph, graph_to_report
 from alchemia.ingestion import load_tables
 from alchemia.joins import find_join_candidates
 from alchemia.keys import discover_keys
-from alchemia.models import AnalysisReport, JoinGraphReport
+from alchemia.models import AnalysisReport, AnalysisSettingsReport, JoinGraphReport
 from alchemia.profiling import profile_tables
 from alchemia.semantics import apply_semantics_plugin
 
@@ -25,12 +31,26 @@ def analyze_path(
     xlsx_sheet_map: dict[str, str] | None = None,
     json_flatten_depth: int = 1,
     graph_top_k_per_pair: int = 3,
+    top_k_edges: int | None = None,
+    distinct_low_card_threshold: int = DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
+    near_unique_threshold: float = DEFAULT_NEAR_UNIQUE_THRESHOLD,
+    date_caps: dict[str, float] | None = None,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
     llm_enabled: bool = False,
     llm_plugin: str | None = None,
 ) -> AnalysisReport:
     """Run ingestion + profiling + key discovery + join discovery + graph build."""
+    resolved_top_k_edges = top_k_edges if top_k_edges is not None else graph_top_k_per_pair
+    settings = AnalysisSettings(
+        min_confidence=min_confidence,
+        top_k_edges=max(1, resolved_top_k_edges),
+        sample_rows=sample_rows,
+        sample_seed=sample_seed,
+        distinct_low_card_threshold=distinct_low_card_threshold,
+        near_unique_threshold=near_unique_threshold,
+        date_caps=merge_date_caps(date_caps),
+    )
     tables = load_tables(
         path=path,
         max_tables=max_tables,
@@ -43,16 +63,23 @@ def analyze_path(
 
     table_profiles = profile_tables(
         tables=tables,
+        near_unique_threshold=settings.near_unique_threshold,
         fast_mode=fast_profile,
         entropy_value_cap=profile_entropy_cap,
     )
-    keys = discover_keys(tables=tables)
+    keys = discover_keys(
+        tables=tables,
+        near_unique_seed_threshold=settings.near_unique_threshold,
+    )
     joins = find_join_candidates(
         tables=tables,
-        sample_rows=sample_rows,
-        sample_seed=sample_seed,
-        min_confidence=min_confidence,
+        sample_rows=settings.sample_rows,
+        sample_seed=settings.sample_seed,
+        min_confidence=settings.min_confidence,
         weights=join_weights,
+        near_unique_threshold=settings.near_unique_threshold,
+        distinct_low_card_threshold=settings.distinct_low_card_threshold,
+        date_caps=settings.date_caps,
     )
     joins = apply_semantics_plugin(
         candidates=joins,
@@ -63,13 +90,18 @@ def analyze_path(
     graph = build_join_graph(
         tables=tables,
         joins=joins,
-        min_confidence=min_confidence,
-        top_k_per_pair=graph_top_k_per_pair,
+        min_confidence=settings.min_confidence,
+        top_k_per_pair=settings.top_k_edges,
     )
-    graph_report = graph_to_report(graph)
+    graph_report = graph_to_report(
+        graph=graph,
+        top_k_per_pair=settings.top_k_edges,
+        min_confidence=settings.min_confidence,
+    )
 
     return AnalysisReport(
         source_path=str(path.resolve()),
+        settings=AnalysisSettingsReport.model_validate(settings.to_report_dict()),
         tables=table_profiles,
         keys=keys,
         joins=joins,
@@ -88,6 +120,10 @@ def build_graph_report(
     xlsx_sheet_map: dict[str, str] | None = None,
     json_flatten_depth: int = 1,
     graph_top_k_per_pair: int = 3,
+    top_k_edges: int | None = None,
+    distinct_low_card_threshold: int = DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
+    near_unique_threshold: float = DEFAULT_NEAR_UNIQUE_THRESHOLD,
+    date_caps: dict[str, float] | None = None,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
     llm_enabled: bool = False,
@@ -105,6 +141,10 @@ def build_graph_report(
         xlsx_sheet_map=xlsx_sheet_map,
         json_flatten_depth=json_flatten_depth,
         graph_top_k_per_pair=graph_top_k_per_pair,
+        top_k_edges=top_k_edges,
+        distinct_low_card_threshold=distinct_low_card_threshold,
+        near_unique_threshold=near_unique_threshold,
+        date_caps=date_caps,
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
         llm_enabled=llm_enabled,

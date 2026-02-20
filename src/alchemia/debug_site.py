@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,11 @@ from alchemia.models import AnalysisReport
 
 def _jsonable(value: Any) -> Any:
     """Convert a Python value to JSON-safe representation."""
-    if isinstance(value, (str, int, float, bool)) or value is None:
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
+        return value
+    if isinstance(value, (str, int, bool)) or value is None:
         return value
     if isinstance(value, (date, datetime)):
         return value.isoformat()
@@ -49,6 +54,9 @@ def _build_payload(
     max_columns: int | None,
     min_confidence: float,
     graph_top_k_per_pair: int,
+    distinct_low_card_threshold: int,
+    near_unique_threshold: float,
+    date_caps: dict[str, float] | None,
     fast_profile: bool,
     profile_entropy_cap: int,
     join_weights: dict[str, float] | None,
@@ -73,6 +81,9 @@ def _build_payload(
         max_columns=max_columns,
         min_confidence=min_confidence,
         graph_top_k_per_pair=graph_top_k_per_pair,
+        distinct_low_card_threshold=distinct_low_card_threshold,
+        near_unique_threshold=near_unique_threshold,
+        date_caps=date_caps,
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
         join_weights=join_weights,
@@ -131,6 +142,9 @@ def _build_payload(
             "sample_seed": sample_seed,
             "min_confidence": min_confidence,
             "graph_top_k_per_pair": graph_top_k_per_pair,
+            "distinct_low_card_threshold": distinct_low_card_threshold,
+            "near_unique_threshold": near_unique_threshold,
+            "date_caps": date_caps or {},
             "fast_profile": fast_profile,
             "profile_entropy_cap": profile_entropy_cap,
         },
@@ -148,67 +162,129 @@ DEBUG_SITE_HTML = """<!doctype html>
   <title>Alchemia Debug Viewer</title>
   <style>
     :root{
-      --bg:#f4f0e8;
-      --panel:#fffaf1;
-      --ink:#1a252f;
-      --muted:#5f6b76;
-      --edge:#d26a3a;
-      --edge-true:#22985f;
-      --edge-false:#cf4457;
-      --accent:#117a8b;
-      --accent-soft:#dbf4f8;
-      --card:#fffef9;
-      --border:#d9cec1;
-      --shadow:0 14px 30px rgba(28, 37, 46, 0.08);
+      --bg:#edf3f9;
+      --bg-2:#f8f1e8;
+      --surface:rgba(255,255,255,0.8);
+      --surface-strong:#ffffff;
+      --surface-soft:#f7fafc;
+      --ink:#10212d;
+      --muted:#5d7081;
+      --edge:#da8a42;
+      --edge-true:#1f9a63;
+      --edge-false:#d44958;
+      --accent:#0f7ea8;
+      --accent-soft:#d7eef8;
+      --card:#ffffff;
+      --border:rgba(16,33,45,0.14);
+      --ring:rgba(15,126,168,0.25);
+      --shadow-soft:0 10px 24px rgba(18, 35, 50, 0.08);
+      --shadow-strong:0 22px 38px rgba(18, 35, 50, 0.14);
     }
     *{box-sizing:border-box}
+    *::-webkit-scrollbar{width:10px;height:10px}
+    *::-webkit-scrollbar-thumb{
+      background:linear-gradient(180deg, rgba(113,133,150,0.58), rgba(84,103,120,0.6));
+      border-radius:999px;
+      border:2px solid transparent;
+      background-clip:padding-box;
+    }
+    *::-webkit-scrollbar-track{background:transparent}
     body{
       margin:0;
       font-family:"Sora","IBM Plex Sans","Segoe UI",sans-serif;
       color:var(--ink);
       background:
-        radial-gradient(circle at 8% 8%, #fff6d5, transparent 35%),
-        radial-gradient(circle at 88% 0%, #dbeff6, transparent 42%),
-        linear-gradient(120deg, #f5efe6 0%, #eef5f4 100%);
+        radial-gradient(1200px 460px at -12% -8%, #d2e8ff 0%, transparent 62%),
+        radial-gradient(820px 360px at 108% -6%, #ffe7c4 0%, transparent 62%),
+        linear-gradient(145deg, var(--bg) 0%, var(--bg-2) 100%);
       min-height:100vh;
+      line-height:1.35;
+      font-feature-settings:"cv10" 1,"ss01" 1;
     }
     .shell{
       display:grid;
-      grid-template-columns:300px 1fr;
+      grid-template-columns:320px 1fr;
       min-height:100vh;
     }
     .sidebar{
       border-right:1px solid var(--border);
-      background:rgba(255,250,241,0.92);
-      backdrop-filter:blur(8px);
-      padding:18px 16px;
+      background:rgba(255,255,255,0.66);
+      backdrop-filter:blur(14px);
+      padding:18px 16px 14px;
       overflow:auto;
+      box-shadow:inset -1px 0 0 rgba(255,255,255,0.46);
     }
     .brand{
-      margin:0 0 6px 0;
-      font-size:1.2rem;
-      letter-spacing:0.03em;
+      margin:0 0 4px 0;
+      font-size:1.24rem;
+      letter-spacing:0.01em;
+      font-weight:750;
+      color:#0f2836;
     }
     .sub{
-      margin:0 0 16px 0;
+      margin:0 0 14px 0;
       color:var(--muted);
-      font-size:0.86rem;
-      line-height:1.4;
+      font-size:0.84rem;
+      line-height:1.46;
     }
     .panel{
-      background:var(--panel);
+      background:var(--surface);
       border:1px solid var(--border);
-      border-radius:12px;
+      border-radius:14px;
       padding:12px;
-      margin-bottom:14px;
-      box-shadow:var(--shadow);
+      margin-bottom:12px;
+      box-shadow:var(--shadow-soft);
+      backdrop-filter:blur(8px);
     }
     .panel h3{
-      margin:0 0 8px 0;
-      font-size:0.86rem;
+      margin:0 0 9px 0;
+      font-size:0.72rem;
       text-transform:uppercase;
-      letter-spacing:0.08em;
+      letter-spacing:0.12em;
       color:var(--muted);
+    }
+    .control-stack{
+      display:grid;
+      gap:9px;
+    }
+    .tool-row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .mini-btn{
+      border:1px solid var(--border);
+      background:linear-gradient(180deg, #fff 0%, #f1f7fb 100%);
+      color:var(--ink);
+      border-radius:999px;
+      padding:7px 11px;
+      cursor:pointer;
+      font-size:0.77rem;
+      font-weight:650;
+      box-shadow:0 4px 10px rgba(17,45,65,0.07);
+      transition:border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+    }
+    .mini-btn:hover{
+      border-color:rgba(16,33,45,0.3);
+      transform:translateY(-1px);
+      box-shadow:0 8px 18px rgba(17,45,65,0.12);
+    }
+    input[type="text"], select{
+      width:100%;
+      border:1px solid var(--border);
+      border-radius:11px;
+      padding:8px 10px;
+      font-size:0.82rem;
+      background:#fbfdff;
+      color:var(--ink);
+      transition:border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+    input[type="text"]::placeholder{color:#8ea0ad}
+    input[type="text"]:focus, select:focus{
+      outline:none;
+      border-color:rgba(15,126,168,0.55);
+      box-shadow:0 0 0 3px var(--ring);
+      background:#ffffff;
     }
     .tabs{
       display:flex;
@@ -218,23 +294,30 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
     .tab{
       border:1px solid var(--border);
-      background:white;
-      color:var(--ink);
+      background:linear-gradient(180deg, #fff 0%, #f1f6fb 100%);
+      color:#214052;
       border-radius:999px;
-      padding:6px 12px;
+      padding:7px 13px;
       cursor:pointer;
-      font-size:0.84rem;
+      font-size:0.82rem;
+      font-weight:630;
+      transition:all 140ms ease;
+      box-shadow:0 4px 10px rgba(17,45,65,0.07);
     }
+    .tab:hover{transform:translateY(-1px)}
     .tab.active{
-      background:var(--accent);
+      background:linear-gradient(145deg, #1186b5 0%, #0e6e93 100%);
       color:white;
-      border-color:var(--accent);
+      border-color:#0e6e93;
+      box-shadow:0 8px 18px rgba(16,108,146,0.28);
     }
     .control-label{
       display:block;
-      font-size:0.78rem;
+      font-size:0.73rem;
       color:var(--muted);
       margin-bottom:6px;
+      text-transform:uppercase;
+      letter-spacing:0.08em;
     }
     input[type="range"], select{
       width:100%;
@@ -250,12 +333,18 @@ DEBUG_SITE_HTML = """<!doctype html>
       width:100%;
       text-align:left;
       border:1px solid var(--border);
-      background:white;
-      border-radius:10px;
-      padding:8px;
+      background:linear-gradient(180deg, #fff 0%, #f7fbff 100%);
+      border-radius:11px;
+      padding:8px 10px;
       color:var(--ink);
       cursor:pointer;
-      font-size:0.83rem;
+      font-size:0.81rem;
+      transition:all 140ms ease;
+    }
+    .table-list button:hover{
+      border-color:rgba(16,33,45,0.28);
+      transform:translateX(1px);
+      box-shadow:0 8px 16px rgba(18,35,50,0.09);
     }
     .main{
       padding:18px;
@@ -264,12 +353,69 @@ DEBUG_SITE_HTML = """<!doctype html>
       flex-direction:column;
       gap:14px;
     }
+    .coverage-strip{
+      margin-bottom:0;
+      padding:10px;
+      background:linear-gradient(120deg, rgba(255,255,255,0.88), rgba(242,249,255,0.9));
+    }
+    .metric-grid{
+      display:grid;
+      gap:9px;
+      grid-template-columns:repeat(8, minmax(88px, 1fr));
+    }
+    .metric-card{
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:linear-gradient(160deg, #ffffff 0%, #f4f8fc 100%);
+      padding:9px 9px 10px;
+      box-shadow:0 5px 14px rgba(18,35,50,0.08);
+      position:relative;
+      overflow:hidden;
+    }
+    .metric-card::after{
+      content:"";
+      position:absolute;
+      top:0;
+      left:0;
+      right:0;
+      height:2px;
+      background:linear-gradient(90deg, #1b93c7 0%, #23a46e 100%);
+      opacity:0.7;
+    }
+    .metric-label{
+      display:block;
+      color:var(--muted);
+      font-size:0.65rem;
+      text-transform:uppercase;
+      letter-spacing:0.1em;
+      margin-bottom:4px;
+    }
+    .metric-value{
+      display:block;
+      font-size:1rem;
+      font-weight:760;
+      line-height:1.1;
+      color:#0f2836;
+    }
+    .workspace-grid{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 390px;
+      gap:14px;
+      min-height:0;
+      flex:1;
+      overflow:hidden;
+    }
+    .center-pane{
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+    }
     .canvas-wrap{
       position:relative;
       border:1px solid var(--border);
       background:rgba(255,255,255,0.86);
       border-radius:16px;
-      box-shadow:var(--shadow);
+      box-shadow:var(--shadow-strong);
       min-height:680px;
       overflow:auto;
     }
@@ -277,6 +423,10 @@ DEBUG_SITE_HTML = """<!doctype html>
       position:relative;
       width:1800px;
       height:1200px;
+      background:
+        linear-gradient(transparent 31px, rgba(120,140,160,0.08) 32px),
+        linear-gradient(90deg, transparent 31px, rgba(120,140,160,0.08) 32px);
+      background-size:32px 32px;
     }
     .edge-layer{
       position:absolute;
@@ -290,27 +440,47 @@ DEBUG_SITE_HTML = """<!doctype html>
     .edge-layer path{
       fill:none;
       stroke:var(--edge);
-      stroke-width:1.8;
-      opacity:0.62;
+      stroke-width:1.9;
+      opacity:0.72;
       pointer-events:stroke;
       cursor:pointer;
+      transition:opacity 140ms ease, stroke-width 140ms ease, stroke 140ms ease, filter 140ms ease;
+    }
+    .edge-layer path.edge-true{stroke:var(--edge-true)}
+    .edge-layer path.edge-false{stroke:var(--edge-false)}
+    .edge-layer path.edge-unknown{stroke:var(--edge)}
+    .edge-layer path.selected{
+      stroke-width:3.5;
+      opacity:1;
+      filter:drop-shadow(0 0 4px rgba(20,32,45,0.34));
     }
     .edge-layer path:hover{
       opacity:1;
-      stroke-width:2.6;
+      stroke-width:2.8;
     }
     .table-card{
       position:absolute;
-      width:280px;
+      width:282px;
       background:var(--card);
       border:1px solid var(--border);
       border-radius:14px;
-      box-shadow:var(--shadow);
+      box-shadow:0 16px 30px rgba(20,37,52,0.16);
       overflow:hidden;
       z-index:3;
+      transition:transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+      animation:tableIn 260ms ease both;
+      transform-origin:center top;
+    }
+    .table-card:hover{
+      transform:translateY(-2px);
+      box-shadow:0 20px 36px rgba(20,37,52,0.2);
+    }
+    .table-card.dimmed{
+      opacity:0.24;
+      filter:saturate(0.8);
     }
     .table-head{
-      background:linear-gradient(120deg,#eef9f7 0%,#fdf6e8 100%);
+      background:linear-gradient(120deg,#f2f9ff 0%,#eaf6f2 100%);
       border-bottom:1px solid var(--border);
       padding:10px 12px;
       cursor:grab;
@@ -320,11 +490,12 @@ DEBUG_SITE_HTML = """<!doctype html>
     .table-head.dragging{cursor:grabbing}
     .table-head h4{
       margin:0;
-      font-size:0.9rem;
+      font-size:0.89rem;
+      letter-spacing:0.01em;
     }
     .table-head span{
       color:var(--muted);
-      font-size:0.76rem;
+      font-size:0.74rem;
     }
     .column-list{
       list-style:none;
@@ -337,21 +508,23 @@ DEBUG_SITE_HTML = """<!doctype html>
       display:flex;
       justify-content:space-between;
       gap:8px;
-      padding:6px 10px;
-      border-bottom:1px dashed #ebe0d4;
+      padding:7px 10px;
+      border-bottom:1px dashed rgba(16,33,45,0.14);
       font-family:"IBM Plex Mono","Fira Code","Consolas",monospace;
-      font-size:0.74rem;
+      font-size:0.73rem;
+      background:#ffffff;
     }
+    .column-list li:nth-child(even){background:#fbfdff}
     .column-list li.join-col{
       background:var(--accent-soft);
-      color:#0e5762;
+      color:#0f5f7d;
       font-weight:600;
     }
     .data-grid,.truth-grid{
       border:1px solid var(--border);
       border-radius:16px;
       background:rgba(255,255,255,0.9);
-      box-shadow:var(--shadow);
+      box-shadow:var(--shadow-strong);
       display:none;
       flex-direction:column;
       min-height:680px;
@@ -366,6 +539,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-bottom:1px solid var(--border);
       align-items:center;
       flex-wrap:wrap;
+      background:linear-gradient(120deg, #f7fbff 0%, #edf6fa 100%);
     }
     .table-preview{
       overflow:auto;
@@ -380,6 +554,50 @@ DEBUG_SITE_HTML = """<!doctype html>
       gap:12px;
       grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
       align-content:start;
+    }
+    .right-rail{
+      border:1px solid var(--border);
+      border-radius:16px;
+      background:rgba(255,255,255,0.9);
+      box-shadow:var(--shadow-strong);
+      overflow:auto;
+      padding:12px;
+      min-height:680px;
+    }
+    .right-rail h3{
+      margin:0 0 10px 0;
+      font-size:0.73rem;
+      text-transform:uppercase;
+      letter-spacing:0.12em;
+      color:var(--muted);
+    }
+    .rail-section{
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:linear-gradient(160deg, #ffffff 0%, #f7fbff 100%);
+      padding:10px;
+      margin-bottom:10px;
+      box-shadow:0 6px 14px rgba(18,35,50,0.08);
+    }
+    .rail-section h4{
+      margin:0 0 8px 0;
+      font-size:0.74rem;
+      letter-spacing:0.1em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .rail-list{
+      font-size:0.79rem;
+      line-height:1.42;
+      max-height:185px;
+      overflow:auto;
+      padding-right:4px;
+    }
+    .rail-list ul{
+      margin:0;
+      padding-left:16px;
+      display:grid;
+      gap:4px;
     }
     .truth-card{
       border:1px solid var(--border);
@@ -408,53 +626,112 @@ DEBUG_SITE_HTML = """<!doctype html>
       line-height:1.45;
     }
     table.preview{
-      border-collapse:collapse;
+      border-collapse:separate;
+      border-spacing:0;
       width:100%;
       min-width:760px;
       background:white;
+      border:1px solid rgba(16,33,45,0.14);
+      border-radius:12px;
+      overflow:hidden;
     }
     table.preview th,table.preview td{
-      border:1px solid #e8dfd4;
-      padding:6px 8px;
+      border-bottom:1px solid rgba(16,33,45,0.1);
+      padding:7px 8px;
       font-size:0.78rem;
       text-align:left;
       white-space:nowrap;
     }
+    table.preview td+td, table.preview th+th{border-left:1px solid rgba(16,33,45,0.08)}
     table.preview th{
       position:sticky;
       top:0;
-      background:#f8f3ea;
+      background:linear-gradient(120deg, #eef6fd 0%, #e8f4ef 100%);
       z-index:2;
+      font-weight:700;
+      font-size:0.74rem;
+      text-transform:uppercase;
+      letter-spacing:0.05em;
+      color:#26485c;
     }
     .hint{
-      font-size:0.78rem;
+      font-size:0.77rem;
       color:var(--muted);
       line-height:1.45;
     }
+    .legend{
+      display:grid;
+      gap:6px;
+      margin-top:4px;
+    }
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:0.75rem;
+      color:var(--muted);
+    }
+    .legend-swatch{
+      width:24px;
+      height:5px;
+      border-radius:999px;
+      background:var(--edge);
+      flex-shrink:0;
+    }
+    .legend-swatch.true{ background:var(--edge-true); }
+    .legend-swatch.false{ background:var(--edge-false); }
     .truth-badge{
       display:inline-block;
       border-radius:999px;
-      padding:2px 8px;
-      font-size:0.72rem;
-      font-weight:700;
-      letter-spacing:0.02em;
-      margin-bottom:6px;
+      padding:3px 9px;
+      font-size:0.7rem;
+      font-weight:750;
+      letter-spacing:0.04em;
+      margin-bottom:7px;
+      text-transform:uppercase;
     }
     .truth-badge.true{
-      background:#e3f6eb;
-      color:#1f7f4e;
-      border:1px solid #93d5ae;
+      background:#dff8ea;
+      color:#1b7d4e;
+      border:1px solid #8fd3ad;
     }
     .truth-badge.false{
-      background:#fde9eb;
-      color:#9e2f3c;
-      border:1px solid #efb3bb;
+      background:#ffe6e9;
+      color:#a52f3f;
+      border:1px solid #efabb5;
+    }
+    .truth-badge.unknown{
+      background:#fff0e4;
+      color:#b56026;
+      border:1px solid #f0c8a8;
+    }
+    @keyframes tableIn{
+      from{ opacity:0; transform:translateY(8px) scale(0.985); }
+      to{ opacity:1; transform:translateY(0) scale(1); }
+    }
+    @media (max-width:1500px){
+      .metric-grid{
+        grid-template-columns:repeat(4, minmax(90px, 1fr));
+      }
+      .workspace-grid{
+        grid-template-columns:minmax(0,1fr);
+      }
+      .right-rail{
+        min-height:420px;
+      }
     }
     @media (max-width:1200px){
       .shell{grid-template-columns:1fr}
-      .sidebar{border-right:0;border-bottom:1px solid var(--border)}
+      .sidebar{
+        border-right:0;
+        border-bottom:1px solid var(--border);
+        box-shadow:none;
+      }
       .main{padding:12px}
       .diagram-canvas{width:1300px;height:1000px}
+      .metric-grid{
+        grid-template-columns:repeat(2, minmax(120px, 1fr));
+      }
     }
   </style>
 </head>
@@ -466,13 +743,39 @@ DEBUG_SITE_HTML = """<!doctype html>
       <div class="tabs">
         <button class="tab active" id="tabDiagram">Relationship Map</button>
         <button class="tab" id="tabData">Table Samples</button>
-        <button class="tab" id="tabTruth">Ground Truth</button>
       </div>
       <section class="panel">
         <h3>Filter</h3>
-        <label class="control-label" for="confidenceRange">Min confidence</label>
-        <input id="confidenceRange" type="range" min="0" max="1" step="0.01" value="0.75">
-        <div class="hint">Current threshold: <strong id="confidenceLabel">0.75</strong></div>
+        <div class="control-stack">
+          <label class="control-label" for="confidenceRange">Min confidence</label>
+          <input id="confidenceRange" type="range" min="0" max="1" step="0.01" value="0.75">
+          <div class="hint">Current threshold: <strong id="confidenceLabel">0.75</strong></div>
+
+          <label class="control-label" for="tableSearch">Table/column search</label>
+          <input id="tableSearch" type="text" placeholder="Try: orders, customer_id, payment">
+
+          <label class="control-label" for="edgeMode">Edge mode</label>
+          <select id="edgeMode">
+            <option value="all">All visible joins</option>
+            <option value="true">Ground-truth joins only</option>
+            <option value="false">Unexpected joins only</option>
+          </select>
+
+          <div class="tool-row">
+            <button class="mini-btn" id="relayoutBtn">Auto Layout</button>
+            <button class="mini-btn" id="fitViewBtn">Fit Visible</button>
+            <button class="mini-btn" id="clearFilterBtn">Clear Filters</button>
+          </div>
+
+          <div class="hint">
+            Visible joins: <strong id="visibleJoinCount">0</strong>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-swatch true"></span>Ground truth edge</div>
+            <div class="legend-item"><span class="legend-swatch false"></span>Unexpected edge</div>
+            <div class="legend-item"><span class="legend-swatch"></span>Unlabeled edge (no manifest)</div>
+          </div>
+        </div>
       </section>
       <section class="panel">
         <h3>Tables</h3>
@@ -484,22 +787,70 @@ DEBUG_SITE_HTML = """<!doctype html>
       </section>
     </aside>
     <main class="main">
-      <section id="diagramView" class="canvas-wrap active">
-        <div id="diagramCanvas" class="diagram-canvas">
-          <svg id="edgeLayer" class="edge-layer"></svg>
+      <section class="panel coverage-strip">
+        <div class="metric-grid">
+          <div class="metric-card"><span class="metric-label">Expected</span><span class="metric-value" id="covExpected">0</span></div>
+          <div class="metric-card"><span class="metric-label">Predicted</span><span class="metric-value" id="covPredicted">0</span></div>
+          <div class="metric-card"><span class="metric-label">Found</span><span class="metric-value" id="covFound">0</span></div>
+          <div class="metric-card"><span class="metric-label">Missing</span><span class="metric-value" id="covMissing">0</span></div>
+          <div class="metric-card"><span class="metric-label">Unexpected</span><span class="metric-value" id="covUnexpected">0</span></div>
+          <div class="metric-card"><span class="metric-label">Recall</span><span class="metric-value" id="covRecall">0.0%</span></div>
+          <div class="metric-card"><span class="metric-label">Precision</span><span class="metric-value" id="covPrecision">0.0%</span></div>
+          <div class="metric-card"><span class="metric-label">Threshold</span><span class="metric-value" id="covThreshold">0.75</span></div>
         </div>
       </section>
-      <section id="dataView" class="data-grid">
-        <div class="data-toolbar">
-          <label class="control-label" for="tableSelect">Table</label>
-          <select id="tableSelect"></select>
-          <span class="hint" id="tableMeta"></span>
+      <div class="workspace-grid">
+        <div class="center-pane">
+          <section id="diagramView" class="canvas-wrap active">
+            <div id="diagramCanvas" class="diagram-canvas">
+              <svg id="edgeLayer" class="edge-layer"></svg>
+            </div>
+          </section>
+          <section id="dataView" class="data-grid">
+            <div class="data-toolbar">
+              <label class="control-label" for="tableSelect">Table</label>
+              <select id="tableSelect"></select>
+              <span class="hint" id="tableMeta"></span>
+            </div>
+            <div id="tablePreview" class="table-preview"></div>
+          </section>
         </div>
-        <div id="tablePreview" class="table-preview"></div>
-      </section>
-      <section id="truthView" class="truth-grid">
-        <div id="truthContent" class="truth-content"></div>
-      </section>
+        <aside class="right-rail">
+          <h3>Ground Truth and Evaluation</h3>
+          <section class="rail-section">
+            <h4>Expected Joins</h4>
+            <div class="rail-list" id="expectedJoinsList"></div>
+          </section>
+          <section class="rail-section">
+            <h4>Joins Found</h4>
+            <div class="rail-list" id="joinsFoundList"></div>
+          </section>
+          <section class="rail-section">
+            <h4>Missing Joins</h4>
+            <div class="rail-list" id="missingJoinsList"></div>
+          </section>
+          <section class="rail-section">
+            <h4>Joins Found But Shouldn't Be</h4>
+            <div class="rail-list" id="unexpectedJoinsList"></div>
+          </section>
+          <section class="rail-section">
+            <h4>Expected Composite Keys</h4>
+            <div class="rail-list" id="compositeKeysList"></div>
+          </section>
+          <section class="rail-section">
+            <h4>Trap Columns</h4>
+            <div class="rail-list" id="trapColumnsList"></div>
+          </section>
+          <section class="rail-section">
+            <h4>Overlap Traps</h4>
+            <div class="rail-list" id="overlapTrapsList"></div>
+          </section>
+          <section class="rail-section">
+            <h4>Misleading Name Traps</h4>
+            <div class="rail-list" id="nameTrapsList"></div>
+          </section>
+        </aside>
+      </div>
     </main>
   </div>
   <script id="alchemiaEmbeddedData" type="application/json">__ALCHEMIA_EMBEDDED_DATA__</script>
@@ -510,6 +861,10 @@ DEBUG_SITE_HTML = """<!doctype html>
       tablePositions: {},
       currentRelationships: [],
       expectedJoinKeys: new Set(),
+      matchingTables: new Set(),
+      tableQuery: "",
+      edgeMode: "all",
+      selectedRelationshipKey: null,
     };
 
     const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -519,7 +874,22 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
 
     function activeRelationships() {
-      return state.payload.report.joins.filter((j) => j.confidence >= state.threshold);
+      const matchingTables = refreshMatchingTables();
+      return state.payload.report.joins.filter((j) => {
+        if (j.confidence < state.threshold) return false;
+        if (matchingTables.size > 0) {
+          if (!(matchingTables.has(j.left_table) || matchingTables.has(j.right_table))) {
+            return false;
+          }
+        }
+        if (state.edgeMode === "true") {
+          return state.expectedJoinKeys.size > 0 && isExpectedRelationship(j);
+        }
+        if (state.edgeMode === "false") {
+          return state.expectedJoinKeys.size > 0 && !isExpectedRelationship(j);
+        }
+        return true;
+      });
     }
 
     function joinDisplay(left, right) {
@@ -538,6 +908,30 @@ DEBUG_SITE_HTML = """<!doctype html>
       return out;
     }
 
+    function tableMatchesQuery(table) {
+      const query = state.tableQuery.trim().toLowerCase();
+      if (!query) return true;
+      if (table.name.toLowerCase().includes(query)) return true;
+      return table.columns.some((col) => String(col.name || "").toLowerCase().includes(query));
+    }
+
+    function refreshMatchingTables() {
+      const set = new Set();
+      state.payload.tables.forEach((table) => {
+        if (tableMatchesQuery(table)) set.add(table.name);
+      });
+      state.matchingTables = set;
+      return set;
+    }
+
+    function isExpectedRelationship(rel) {
+      const key = relationKey(
+        `${rel.left_table}.${rel.left_column}`,
+        `${rel.right_table}.${rel.right_column}`
+      );
+      return state.expectedJoinKeys.has(key);
+    }
+
     function relationshipColumnsByTable() {
       const map = new Map();
       activeRelationships().forEach((rel) => {
@@ -552,7 +946,9 @@ DEBUG_SITE_HTML = """<!doctype html>
     function renderTableList() {
       const list = document.getElementById("tableList");
       list.innerHTML = "";
-      state.payload.tables.forEach((table) => {
+      const matching = refreshMatchingTables();
+      const visibleTables = state.payload.tables.filter((table) => matching.has(table.name));
+      visibleTables.forEach((table) => {
         const button = document.createElement("button");
         button.textContent = `${table.name} (${table.row_count.toLocaleString()} rows)`;
         button.addEventListener("click", () => {
@@ -564,6 +960,9 @@ DEBUG_SITE_HTML = """<!doctype html>
         li.appendChild(button);
         list.appendChild(li);
       });
+      if (visibleTables.length === 0) {
+        list.innerHTML = `<li><div class="hint">No tables match current filter.</div></li>`;
+      }
     }
 
     function buildCard(table, joinCols) {
@@ -627,27 +1026,27 @@ DEBUG_SITE_HTML = """<!doctype html>
         const hasGroundTruth = state.expectedJoinKeys.size > 0;
         const isTrue = hasGroundTruth && state.expectedJoinKeys.has(relKey);
         const isFalse = hasGroundTruth && !isTrue;
+        const truthState = isTrue ? "true" : (isFalse ? "false" : "unknown");
 
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`);
         path.setAttribute("stroke-opacity", String(clamp(rel.confidence, 0.25, 1)));
-        if (isTrue) {
-          path.setAttribute("stroke", "var(--edge-true)");
-        } else if (isFalse) {
-          path.setAttribute("stroke", "var(--edge-false)");
-        } else {
-          path.setAttribute("stroke", "var(--edge)");
+        path.classList.add(`edge-${truthState}`);
+        if (state.selectedRelationshipKey === relKey) {
+          path.classList.add("selected");
         }
         path.dataset.edge = JSON.stringify(rel);
         path.style.pointerEvents = "stroke";
         path.addEventListener("click", () => {
+          state.selectedRelationshipKey = relKey;
+          drawEdges(state.currentRelationships, canvas, edgeLayer);
           const details = document.getElementById("relationDetails");
           const signals = Object.entries(rel.breakdown.signals || {})
             .map(([k, v]) => `${k}: ${Number(v).toFixed(3)}`)
             .join("<br>");
           const truthBadge = hasGroundTruth
-            ? `<span class="truth-badge ${isTrue ? "true" : "false"}">${isTrue ? "TRUE relationship" : "FALSE relationship"}</span><br>`
-            : "";
+            ? `<span class="truth-badge ${truthState}">${isTrue ? "TRUE relationship" : "FALSE relationship"}</span><br>`
+            : `<span class="truth-badge unknown">UNLABELED relationship</span><br>`;
           details.innerHTML = `
             ${truthBadge}
             <strong>${rel.left_table}.${rel.left_column}</strong> -> <strong>${rel.right_table}.${rel.right_column}</strong><br>
@@ -723,19 +1122,75 @@ DEBUG_SITE_HTML = """<!doctype html>
       });
     }
 
+    function updateVisibleJoinCount(relationships) {
+      const el = document.getElementById("visibleJoinCount");
+      if (el) el.textContent = String(relationships.length);
+    }
+
+    function autoLayoutTables() {
+      const matching = refreshMatchingTables();
+      const tableDegree = new Map();
+      activeRelationships().forEach((join) => {
+        tableDegree.set(join.left_table, (tableDegree.get(join.left_table) || 0) + 1);
+        tableDegree.set(join.right_table, (tableDegree.get(join.right_table) || 0) + 1);
+      });
+      const ordered = [...state.payload.tables]
+        .filter((table) => matching.size === 0 || matching.has(table.name))
+        .sort((a, b) => {
+          const da = tableDegree.get(a.name) || 0;
+          const db = tableDegree.get(b.name) || 0;
+          if (db !== da) return db - da;
+          return a.name.localeCompare(b.name);
+        });
+      ordered.forEach((table, idx) => {
+        state.tablePositions[table.name] = layoutPosition(idx, ordered.length);
+      });
+    }
+
+    function fitVisibleTables() {
+      const view = document.getElementById("diagramView");
+      const canvas = document.getElementById("diagramCanvas");
+      const cards = [...canvas.querySelectorAll(".table-card:not(.dimmed)")];
+      if (cards.length === 0) return;
+
+      let minX = Number.POSITIVE_INFINITY;
+      let minY = Number.POSITIVE_INFINITY;
+      let maxX = Number.NEGATIVE_INFINITY;
+      let maxY = Number.NEGATIVE_INFINITY;
+      cards.forEach((card) => {
+        minX = Math.min(minX, card.offsetLeft);
+        minY = Math.min(minY, card.offsetTop);
+        maxX = Math.max(maxX, card.offsetLeft + card.offsetWidth);
+        maxY = Math.max(maxY, card.offsetTop + card.offsetHeight);
+      });
+
+      const targetX = Math.max(0, minX - 60);
+      const targetY = Math.max(0, minY - 60);
+      const targetCenterX = targetX + (maxX - minX) / 2;
+      const targetCenterY = targetY + (maxY - minY) / 2;
+      const scrollLeft = Math.max(0, targetCenterX - view.clientWidth / 2);
+      const scrollTop = Math.max(0, targetCenterY - view.clientHeight / 2);
+      view.scrollTo({ left: scrollLeft, top: scrollTop, behavior: "smooth" });
+    }
+
     function renderDiagram() {
       const canvas = document.getElementById("diagramCanvas");
       const edgeLayer = document.getElementById("edgeLayer");
       canvas.querySelectorAll(".table-card").forEach((el) => el.remove());
       const joins = activeRelationships();
       state.currentRelationships = joins;
+      updateVisibleJoinCount(joins);
       const colsByTable = relationshipColumnsByTable();
+      const matchingTables = refreshMatchingTables();
 
       state.payload.tables.forEach((table, index) => {
         const card = buildCard(table, colsByTable.get(table.name));
         const pos = state.tablePositions[table.name] || layoutPosition(index, state.payload.tables.length);
         state.tablePositions[table.name] = pos;
         positionCard(card, pos.x, pos.y);
+        if (state.tableQuery.trim() && !matchingTables.has(table.name)) {
+          card.classList.add("dimmed");
+        }
         canvas.appendChild(card);
         attachDrag(card, canvas, edgeLayer);
       });
@@ -902,11 +1357,36 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
 
     function renderGroundTruth() {
-      const host = document.getElementById("truthContent");
       const manifest = state.payload.manifest;
+      const setRail = (id, items) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = listHtml(items);
+      };
+      const setMetric = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(value);
+      };
+
+      setMetric("covThreshold", state.threshold.toFixed(2));
+
       if (!manifest) {
         state.expectedJoinKeys = new Set();
-        host.innerHTML = `<article class="truth-card"><h4>Ground Truth</h4><div class="hint">No manifest.json found in analyzed folder.</div></article>`;
+        setMetric("covExpected", 0);
+        setMetric("covPredicted", state.currentRelationships.length);
+        setMetric("covFound", 0);
+        setMetric("covMissing", 0);
+        setMetric("covUnexpected", 0);
+        setMetric("covRecall", "0.0%");
+        setMetric("covPrecision", "0.0%");
+        const noManifest = ["No manifest.json found in analyzed folder."];
+        setRail("expectedJoinsList", noManifest);
+        setRail("joinsFoundList", noManifest);
+        setRail("missingJoinsList", noManifest);
+        setRail("unexpectedJoinsList", noManifest);
+        setRail("compositeKeysList", noManifest);
+        setRail("trapColumnsList", noManifest);
+        setRail("overlapTrapsList", noManifest);
+        setRail("nameTrapsList", noManifest);
         return;
       }
 
@@ -942,56 +1422,27 @@ DEBUG_SITE_HTML = """<!doctype html>
       const overlapTrapLines = collectOverlapTraps(ground);
       const misleadingLines = collectMisleadingNameTraps(ground);
 
-      host.innerHTML = `
-        <article class="truth-card">
-          <h4>Coverage</h4>
-          <div class="truth-stat">Expected joins: <strong>${expectedMap.size}</strong></div>
-          <div class="truth-stat">Predicted joins: <strong>${predictedMap.size}</strong></div>
-          <div class="truth-stat">Found joins: <strong>${found.length}</strong></div>
-          <div class="truth-stat">Recall: <strong>${(recall * 100).toFixed(1)}%</strong></div>
-          <div class="truth-stat">Precision: <strong>${(precision * 100).toFixed(1)}%</strong></div>
-          <div class="truth-stat">Missing joins: ${missing.length}</div>
-          <div class="truth-stat">Unexpected joins: ${unexpected.length}</div>
-          <div class="hint">Using current confidence threshold: ${state.threshold.toFixed(2)}</div>
-        </article>
-        <article class="truth-card">
-          <h4>Expected Joins</h4>
-          ${listHtml(Array.from(expectedMap.values()))}
-        </article>
-        <article class="truth-card">
-          <h4>Joins Found</h4>
-          ${listHtml(predictedList)}
-        </article>
-        <article class="truth-card">
-          <h4>Missing Joins</h4>
-          ${listHtml(missing)}
-        </article>
-        <article class="truth-card">
-          <h4>Joins Found But Shouldn't Be</h4>
-          ${listHtml(unexpected)}
-        </article>
-        <article class="truth-card">
-          <h4>Expected Composite Keys</h4>
-          ${listHtml(compositeKeys)}
-        </article>
-        <article class="truth-card">
-          <h4>Trap Columns</h4>
-          ${listHtml(trapColumns)}
-        </article>
-        <article class="truth-card">
-          <h4>Overlap Traps</h4>
-          ${listHtml(overlapTrapLines)}
-        </article>
-        <article class="truth-card">
-          <h4>Misleading Name Traps</h4>
-          ${listHtml(misleadingLines)}
-        </article>
-      `;
+      setMetric("covExpected", expectedMap.size);
+      setMetric("covPredicted", predictedMap.size);
+      setMetric("covFound", found.length);
+      setMetric("covMissing", missing.length);
+      setMetric("covUnexpected", unexpected.length);
+      setMetric("covRecall", `${(recall * 100).toFixed(1)}%`);
+      setMetric("covPrecision", `${(precision * 100).toFixed(1)}%`);
+
+      setRail("expectedJoinsList", Array.from(expectedMap.values()));
+      setRail("joinsFoundList", predictedList);
+      setRail("missingJoinsList", missing);
+      setRail("unexpectedJoinsList", unexpected);
+      setRail("compositeKeysList", compositeKeys);
+      setRail("trapColumnsList", trapColumns);
+      setRail("overlapTrapsList", overlapTrapLines);
+      setRail("nameTrapsList", misleadingLines);
     }
 
     function setActiveView(view) {
-      const tabIds = ["tabDiagram", "tabData", "tabTruth"];
-      const viewIds = ["diagramView", "dataView", "truthView"];
+      const tabIds = ["tabDiagram", "tabData"];
+      const viewIds = ["diagramView", "dataView"];
       tabIds.forEach((id) => document.getElementById(id).classList.remove("active"));
       viewIds.forEach((id) => document.getElementById(id).classList.remove("active"));
       document.getElementById(`tab${view}`).classList.add("active");
@@ -1006,11 +1457,6 @@ DEBUG_SITE_HTML = """<!doctype html>
       setActiveView("Data");
     }
 
-    function switchToTruth() {
-      renderGroundTruth();
-      setActiveView("Truth");
-    }
-
     async function init() {
       const embedded = document.getElementById("alchemiaEmbeddedData");
       const embeddedText = embedded?.textContent?.trim() || "";
@@ -1023,12 +1469,50 @@ DEBUG_SITE_HTML = """<!doctype html>
       refreshExpectedJoinKeys();
       const slider = document.getElementById("confidenceRange");
       const label = document.getElementById("confidenceLabel");
+      const searchInput = document.getElementById("tableSearch");
+      const edgeModeSelect = document.getElementById("edgeMode");
+      const relayoutBtn = document.getElementById("relayoutBtn");
+      const fitViewBtn = document.getElementById("fitViewBtn");
+      const clearFilterBtn = document.getElementById("clearFilterBtn");
       slider.value = String(state.payload.meta.min_confidence ?? 0.75);
       state.threshold = Number(slider.value);
       label.textContent = Number(slider.value).toFixed(2);
       slider.addEventListener("input", () => {
         state.threshold = Number(slider.value);
         label.textContent = Number(slider.value).toFixed(2);
+        state.selectedRelationshipKey = null;
+        renderTableList();
+        renderDiagram();
+        renderGroundTruth();
+      });
+      searchInput.addEventListener("input", () => {
+        state.tableQuery = searchInput.value || "";
+        state.selectedRelationshipKey = null;
+        renderTableList();
+        renderDiagram();
+        renderGroundTruth();
+      });
+      edgeModeSelect.addEventListener("change", () => {
+        state.edgeMode = edgeModeSelect.value || "all";
+        state.selectedRelationshipKey = null;
+        renderDiagram();
+        renderGroundTruth();
+      });
+      relayoutBtn.addEventListener("click", () => {
+        autoLayoutTables();
+        renderDiagram();
+        fitVisibleTables();
+      });
+      fitViewBtn.addEventListener("click", () => {
+        fitVisibleTables();
+      });
+      clearFilterBtn.addEventListener("click", () => {
+        state.tableQuery = "";
+        state.edgeMode = "all";
+        state.selectedRelationshipKey = null;
+        searchInput.value = "";
+        edgeModeSelect.value = "all";
+        renderTableList();
         renderDiagram();
         renderGroundTruth();
       });
@@ -1041,11 +1525,12 @@ DEBUG_SITE_HTML = """<!doctype html>
 
       document.getElementById("tabDiagram").addEventListener("click", switchToDiagram);
       document.getElementById("tabData").addEventListener("click", switchToData);
-      document.getElementById("tabTruth").addEventListener("click", switchToTruth);
 
       renderTableList();
       renderTableSelect();
+      autoLayoutTables();
       renderDiagram();
+      fitVisibleTables();
       renderGroundTruth();
     }
 
@@ -1068,6 +1553,9 @@ def build_debug_site(
     max_columns: int | None = None,
     min_confidence: float = 0.75,
     graph_top_k_per_pair: int = 3,
+    distinct_low_card_threshold: int = 64,
+    near_unique_threshold: float = 0.90,
+    date_caps: dict[str, float] | None = None,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
     join_weights: dict[str, float] | None = None,
@@ -1087,6 +1575,9 @@ def build_debug_site(
         max_columns=max_columns,
         min_confidence=min_confidence,
         graph_top_k_per_pair=graph_top_k_per_pair,
+        distinct_low_card_threshold=distinct_low_card_threshold,
+        near_unique_threshold=near_unique_threshold,
+        date_caps=date_caps,
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
         join_weights=join_weights,
@@ -1100,7 +1591,7 @@ def build_debug_site(
     out_dir.mkdir(parents=True, exist_ok=True)
     index_path = out_dir / "index.html"
     data_path = out_dir / "data.json"
-    payload_json = json.dumps(payload, indent=2)
+    payload_json = json.dumps(_jsonable(payload), indent=2, allow_nan=False)
     embedded_payload = payload_json.replace("</", "<\\/")
     rendered_html = DEBUG_SITE_HTML.replace("__ALCHEMIA_EMBEDDED_DATA__", embedded_payload)
     index_path.write_text(rendered_html, encoding="utf-8")

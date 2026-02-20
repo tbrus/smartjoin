@@ -1,0 +1,87 @@
+{
+  "generator": "bundle/alchemia_challenge_datasets",
+  "generated_at": "2026-02-20T08:53:49Z",
+  "dataset": "04_saas_ambiguity",
+  "config": {
+    "profile": "medium",
+    "notes": "SaaS with ambiguous acct_id namespace and heavy events table."
+  },
+  "row_counts": {
+    "accounts": 6000,
+    "contacts": 16000,
+    "subscriptions": 9000,
+    "events": 90000
+  },
+  "expected_joins": [
+    "contacts.acct_id -> accounts.account_id",
+    "subscriptions.account_id -> accounts.account_id",
+    "events.account_id -> accounts.account_id",
+    "events.contact_id -> contacts.contact_id"
+  ],
+  "expected_composite_keys": [],
+  "trap_columns": [
+    "country",
+    "created_date",
+    "status",
+    "currency",
+    "event_ts"
+  ],
+  "ground_truth": {
+    "core_relationships": [
+      {
+        "from_table": "contacts",
+        "from_column": "acct_id",
+        "to_table": "accounts",
+        "to_column": "account_id",
+        "relationship": "many_to_one",
+        "dirty_keys_present": true
+      },
+      {
+        "from_table": "subscriptions",
+        "from_column": "account_id",
+        "to_table": "accounts",
+        "to_column": "account_id",
+        "relationship": "many_to_one",
+        "dirty_keys_present": true
+      },
+      {
+        "from_table": "events",
+        "from_column": "account_id",
+        "to_table": "accounts",
+        "to_column": "account_id",
+        "relationship": "many_to_one",
+        "dirty_keys_present": true
+      },
+      {
+        "from_table": "events",
+        "from_column": "contact_id",
+        "to_table": "contacts",
+        "to_column": "contact_id",
+        "relationship": "many_to_one",
+        "dirty_keys_present": true
+      }
+    ],
+    "composite_key_candidates": [],
+    "traps": {
+      "shared_low_cardinality_columns": [
+        "country",
+        "status",
+        "currency"
+      ],
+      "date_like_columns": [
+        "created_date",
+        "start_date",
+        "end_date",
+        "event_ts"
+      ],
+      "misleading_name_pairs": [
+        {
+          "left": "contacts.acct_id",
+          "right": "accounts.account_id",
+          "reason": "Namespace mismatch: acct_id may include 'ACC' prefix."
+        }
+      ],
+      "overlapping_value_traps": []
+    }
+  }
+}

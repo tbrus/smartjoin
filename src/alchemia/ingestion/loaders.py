@@ -68,7 +68,22 @@ def _load_xlsx(path: Path, sheet_name: str | None = None) -> pl.DataFrame:
 
     target_sheet = sheet_name if sheet_name is not None else 0
     frame = pd.read_excel(path, sheet_name=target_sheet)
-    return pl.DataFrame(frame.to_dict(orient="list"))
+    # Excel sheets often contain mixed-type object columns (text + blanks + temporal values).
+    # Build columns explicitly and coerce ambiguous object/temporal data to string for stability.
+    normalized: dict[str, list[Any]] = {}
+    for col_name in frame.columns:
+        series = frame[col_name].where(frame[col_name].notna(), None)
+        values = series.tolist()
+        if pd.api.types.is_datetime64_any_dtype(series) or pd.api.types.is_timedelta64_dtype(series):
+            normalized[col_name] = [None if value is None else str(value) for value in values]
+            continue
+        if pd.api.types.is_object_dtype(series):
+            non_null_types = {type(value) for value in values if value is not None}
+            if len(non_null_types) > 1:
+                normalized[col_name] = [None if value is None else str(value) for value in values]
+                continue
+        normalized[col_name] = values
+    return pl.DataFrame(normalized, strict=False)
 
 
 def _load_json(path: Path, flatten_depth: int = 1) -> pl.DataFrame:

@@ -1,9 +1,10 @@
 import json
+import math
 from pathlib import Path
 
 import polars as pl
 
-from alchemia.debug_site import build_debug_site
+from alchemia.debug_site import _jsonable, build_debug_site
 
 
 def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
@@ -32,11 +33,15 @@ def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
     html = index_path.read_text(encoding="utf-8")
     assert "alchemiaEmbeddedData" in html
     assert "__ALCHEMIA_EMBEDDED_DATA__" not in html
-    assert "tabTruth" in html
+    assert "covRecall" in html
+    assert "covPrecision" in html
+    assert "expectedJoinsList" in html
+    assert "unexpectedJoinsList" in html
     assert "Joins Found But Shouldn't Be" in html
     assert "Missing Joins" in html
-    assert "Precision:" in html
     assert "TRUE relationship" in html
+    assert "UNLABELED relationship" in html
+    assert "edge-unknown" in html
     assert "attachDrag" in html
     assert "Core Relationships" not in html
 
@@ -87,3 +92,9 @@ def test_build_debug_site_includes_manifest_when_available(tmp_path: Path) -> No
     payload = json.loads(data_path.read_text(encoding="utf-8"))
     assert payload["manifest"] is not None
     assert payload["manifest"]["expected_joins"]
+
+
+def test_jsonable_sanitizes_non_finite_floats() -> None:
+    payload = {"nan_value": math.nan, "inf_value": math.inf, "nested": [1.0, -math.inf]}
+    out = _jsonable(payload)
+    assert out == {"nan_value": None, "inf_value": None, "nested": [1.0, None]}

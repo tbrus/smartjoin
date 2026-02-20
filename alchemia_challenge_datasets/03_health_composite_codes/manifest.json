@@ -1,0 +1,92 @@
+{
+  "generator": "bundle/alchemia_challenge_datasets",
+  "generated_at": "2026-02-20T08:53:49Z",
+  "dataset": "03_health_composite_codes",
+  "config": {
+    "profile": "medium",
+    "notes": "Healthcare-ish with composite diagnoses key and code dimension."
+  },
+  "row_counts": {
+    "patients": 8000,
+    "visits": 30000,
+    "diagnoses": 70000,
+    "icd10_dim": 8
+  },
+  "expected_joins": [
+    "visits.patient_id -> patients.patient_id",
+    "diagnoses.visit_id -> visits.visit_id",
+    "diagnoses.icd10_code -> icd10_dim.icd10_code"
+  ],
+  "expected_composite_keys": [
+    "diagnoses(visit_id, seq) near-unique"
+  ],
+  "trap_columns": [
+    "country",
+    "status",
+    "present_on_admission",
+    "created_date",
+    "admit_date",
+    "discharge_date"
+  ],
+  "ground_truth": {
+    "core_relationships": [
+      {
+        "from_table": "visits",
+        "from_column": "patient_id",
+        "to_table": "patients",
+        "to_column": "patient_id",
+        "relationship": "many_to_one",
+        "dirty_keys_present": true
+      },
+      {
+        "from_table": "diagnoses",
+        "from_column": "visit_id",
+        "to_table": "visits",
+        "to_column": "visit_id",
+        "relationship": "many_to_one",
+        "dirty_keys_present": false
+      },
+      {
+        "from_table": "diagnoses",
+        "from_column": "icd10_code",
+        "to_table": "icd10_dim",
+        "to_column": "icd10_code",
+        "relationship": "many_to_one",
+        "dirty_keys_present": false
+      }
+    ],
+    "composite_key_candidates": [
+      {
+        "table": "diagnoses",
+        "columns": [
+          "visit_id",
+          "seq"
+        ],
+        "notes": "Near-unique with controlled duplicates / repeated sequences."
+      }
+    ],
+    "traps": {
+      "shared_low_cardinality_columns": [
+        "country",
+        "status",
+        "present_on_admission",
+        "sex",
+        "department"
+      ],
+      "date_like_columns": [
+        "created_date",
+        "dob",
+        "admit_date",
+        "discharge_date"
+      ],
+      "misleading_name_pairs": [
+        {
+          "left": "patients.mrn",
+          "right": "visits.patient_id",
+          "reason": "Different identifier domains (MRN vs patient_id)."
+        }
+      ],
+      "overlapping_value_traps": []
+    }
+  }
+}

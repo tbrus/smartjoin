@@ -37,6 +37,17 @@ Tune behavior:
 alchemia analyze ./data --sample-rows 5000 --max-tables 10 --max-columns 40 --min-confidence 0.8
 ```
 
+Advanced join-control knobs:
+
+```bash
+alchemia analyze ./data \
+  --sample-rows 12000 \
+  --top-k-edges 3 \
+  --distinct-low-card-threshold 64 \
+  --near-unique-threshold 0.9 \
+  --date-caps "temporal_overlap=0.65,mixed_temporal=0.75"
+```
+
 Build only join graph:
 
 ```bash

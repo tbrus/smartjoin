@@ -22,6 +22,9 @@ def build_join_graph(
 ) -> nx.MultiGraph:
     """Build a graph of table joins above threshold, retaining top-K alternatives per pair."""
     graph = nx.MultiGraph()
+    effective_top_k = max(1, top_k_per_pair)
+    graph.graph["top_k_per_pair"] = int(effective_top_k)
+    graph.graph["min_confidence"] = float(min_confidence)
 
     for table in tables:
         graph.add_node(table.name, row_count=table.df.height)
@@ -32,7 +35,6 @@ def build_join_graph(
             continue
         grouped[_edge_group_id(join.left_table, join.right_table)].append(join)
 
-    effective_top_k = max(1, top_k_per_pair)
     for edge_group_id, candidates in grouped.items():
         ranked = sorted(
             candidates,
@@ -59,8 +61,16 @@ def build_join_graph(
     return graph
 
 
-def graph_to_report(graph: nx.Graph | nx.MultiGraph) -> JoinGraphReport:
+def graph_to_report(
+    graph: nx.Graph | nx.MultiGraph,
+    top_k_per_pair: int | None = None,
+    min_confidence: float | None = None,
+) -> JoinGraphReport:
     """Convert NetworkX graph into typed report model."""
+    resolved_top_k = int(top_k_per_pair or graph.graph.get("top_k_per_pair", 1))
+    resolved_min_confidence = float(
+        min_confidence if min_confidence is not None else graph.graph.get("min_confidence", 0.0)
+    )
     nodes = [
         JoinGraphNode(
             table_name=str(node_name),
@@ -121,4 +131,9 @@ def graph_to_report(graph: nx.Graph | nx.MultiGraph) -> JoinGraphReport:
         ),
     )
 
-    return JoinGraphReport(nodes=nodes, edges=edges)
+    return JoinGraphReport(
+        top_k_per_pair=max(1, resolved_top_k),
+        min_confidence=max(0.0, min(1.0, resolved_min_confidence)),
+        nodes=nodes,
+        edges=edges,
+    )

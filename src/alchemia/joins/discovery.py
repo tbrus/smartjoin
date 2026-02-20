@@ -7,6 +7,11 @@ from difflib import SequenceMatcher
 
 import polars as pl
 
+from alchemia.config import (
+    DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
+    DEFAULT_NEAR_UNIQUE_THRESHOLD,
+    merge_date_caps,
+)
 from alchemia.joins.signatures import (
     ColumnSignature,
     SignatureCache,
@@ -164,15 +169,18 @@ def _build_identifier_hubs(signatures: SignatureCache) -> dict[str, tuple[str, s
     return hubs
 
 
-def _is_categorical(sig: ColumnSignature) -> bool:
+def _is_categorical(sig: ColumnSignature, distinct_low_card_threshold: int) -> bool:
     if _is_identifier(sig):
         return False
     if sig.row_count == 0:
         return False
     distinct_ratio = sig.distinct_count / sig.row_count
-    if sig.distinct_count <= 64:
+    if sig.distinct_count <= distinct_low_card_threshold:
         return True
-    return distinct_ratio <= 0.02 and sig.distinct_count <= 256
+    return (
+        distinct_ratio <= 0.02
+        and sig.distinct_count <= max(256, distinct_low_card_threshold * 4)
+    )
 
 
 def _is_measure_like(sig: ColumnSignature) -> bool:
@@ -293,6 +301,7 @@ def _spurious_guard(
     sibling_non_hub: bool,
     mirror_pair: bool,
     canonical_penalty: float,
+    distinct_low_card_threshold: int,
 ) -> float:
     if fk.row_count == 0 or pk.row_count == 0:
         return 0.0
@@ -310,7 +319,24 @@ def _spurious_guard(
         return 0.0
     if _is_measure_like(fk) and _is_measure_like(pk) and name_similarity < 0.95:
         return 0.0
-    if not is_date_pair and _is_categorical(fk) and _is_categorical(pk):
+    # Allow specific code-domain joins (e.g. diagnosis_code -> code dimension)
+    # when both sides clearly refer to the same non-generic code namespace.
+    generic_code_entities = {"status", "country", "currency", "type", "category"}
+    same_specific_code_domain = (
+        fk.name_features.code_like
+        and pk.name_features.code_like
+        and fk.name_features.entity_core
+        and fk.name_features.entity_core == pk.name_features.entity_core
+        and fk.name_features.entity_core not in generic_code_entities
+        and name_similarity >= 0.8
+        and inclusion_fk_in_pk >= 0.9
+        and pk.uniqueness_ratio >= 0.9
+    )
+    if same_specific_code_domain:
+        return canonical_penalty
+    if not is_date_pair and _is_categorical(
+        fk, distinct_low_card_threshold
+    ) and _is_categorical(pk, distinct_low_card_threshold):
         return 0.0
     fk_identifier = _is_identifier(fk)
     pk_identifier = _is_identifier(pk)
@@ -387,20 +413,60 @@ def _date_signal_and_cap(
     fk: ColumnSignature,
     pk: ColumnSignature,
     inclusion_fk_in_pk: float,
+    date_caps: dict[str, float],
 ) -> tuple[float, float, str | None]:
     """Return `(date_signal, confidence_cap, relationship_override)`."""
+    temporal_overlap_cap = float(date_caps["temporal_overlap"])
+    mixed_temporal_cap = float(date_caps["mixed_temporal"])
+    temporal_overlap_signal = float(date_caps["temporal_overlap_signal"])
+    mixed_temporal_signal = float(date_caps["mixed_temporal_signal"])
+
     if not (fk.name_features.date_like and pk.name_features.date_like):
         return 1.0, 1.0, None
 
+    # Surrogate keys such as `date_key` should not be treated as raw temporal overlaps.
+    if (
+        (fk.name_features.key_like or fk.name_features.id_like)
+        and (pk.name_features.key_like or pk.name_features.id_like)
+    ):
+        return 1.0, 1.0, None
+
+    def _temporal_role(tokens: tuple[str, ...]) -> str:
+        token_set = set(tokens)
+        if "start" in token_set or "end" in token_set:
+            return "range_boundary"
+        if token_set & {"created", "updated", "shipped", "delivered", "applied"}:
+            return "audit_like"
+        if "date" in token_set and len(token_set) <= 2:
+            return "calendar_like"
+        return "temporal_other"
+
     # Typical calendar/date-dimension pattern.
-    if pk.uniqueness_ratio >= 0.95 and fk.uniqueness_ratio <= 0.5 and inclusion_fk_in_pk >= 0.85:
+    if (
+        pk.uniqueness_ratio >= 0.95
+        and fk.uniqueness_ratio <= 0.7
+        and inclusion_fk_in_pk >= 0.85
+        and fk.row_count >= (pk.row_count * 2)
+    ):
         return 1.0, 1.0, "date_dimension_join"
+
+    # Unique-to-unique date columns across tables are commonly coincidental and
+    # should be inspectable but not promoted above conservative defaults.
+    if fk.uniqueness_ratio >= 0.95 and pk.uniqueness_ratio >= 0.95:
+        return mixed_temporal_signal, min(mixed_temporal_cap, 0.68), "temporal_overlap"
+
+    # Mismatched temporal roles (e.g., `created_date` vs `end_date`) are usually
+    # coincidental overlaps and should stay below conservative default thresholds.
+    fk_role = _temporal_role(fk.name_features.tokens)
+    pk_role = _temporal_role(pk.name_features.tokens)
+    if fk_role != pk_role and {"range_boundary", "audit_like"} & {fk_role, pk_role}:
+        return mixed_temporal_signal, min(mixed_temporal_cap, 0.62), "temporal_overlap"
 
     # Keep temporal overlaps inspectable but capped to avoid dominating true key joins.
     if fk.uniqueness_ratio <= 0.5 and pk.uniqueness_ratio <= 0.5:
-        return 0.35, 0.65, "temporal_overlap"
+        return temporal_overlap_signal, temporal_overlap_cap, "temporal_overlap"
 
-    return 0.6, 0.75, "temporal_overlap"
+    return mixed_temporal_signal, mixed_temporal_cap, "temporal_overlap"
 
 
 def _cardinality_alignment(fk_uniqueness: float, pk_uniqueness: float) -> float:
@@ -477,11 +543,14 @@ def find_join_candidates(
     min_confidence: float = 0.8,
     weights: dict[str, float] | None = None,
     sample_seed: int = 42,
-    near_unique_threshold: float = 0.90,
+    near_unique_threshold: float = DEFAULT_NEAR_UNIQUE_THRESHOLD,
+    distinct_low_card_threshold: int = DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
+    date_caps: dict[str, float] | None = None,
     signature_cache: SignatureCache | None = None,
 ) -> list[JoinCandidate]:
     """Find join candidates using cached column signatures."""
     normalized_weights = _normalize_weights(weights)
+    effective_date_caps = merge_date_caps(date_caps)
     signatures = signature_cache or build_column_signatures(
         tables=tables,
         sample_rows=sample_rows,
@@ -575,6 +644,7 @@ def find_join_candidates(
                             table_identifier_winners=table_identifier_winners,
                         )
                     ),
+                    distinct_low_card_threshold=distinct_low_card_threshold,
                 )
                 if spurious_guard == 0.0:
                     continue
@@ -582,6 +652,7 @@ def find_join_candidates(
                     fk=fk_sig,
                     pk=pk_sig,
                     inclusion_fk_in_pk=inclusion_fk_in_pk,
+                    date_caps=effective_date_caps,
                 )
 
                 signals = {

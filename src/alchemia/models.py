@@ -112,14 +112,29 @@ class JoinGraphEdge(BaseModel):
 class JoinGraphReport(BaseModel):
     """Serializable join graph report."""
 
+    top_k_per_pair: int = Field(ge=1)
+    min_confidence: float = Field(ge=0.0, le=1.0)
     nodes: list[JoinGraphNode]
     edges: list[JoinGraphEdge]
+
+
+class AnalysisSettingsReport(BaseModel):
+    """Settings snapshot used to generate a report."""
+
+    min_confidence: float = Field(ge=0.0, le=1.0)
+    top_k_edges: int = Field(ge=1)
+    sample_rows: int = Field(ge=1)
+    sample_seed: int = Field(ge=0)
+    distinct_low_card_threshold: int = Field(ge=1)
+    near_unique_threshold: float = Field(ge=0.0, le=1.0)
+    date_caps: dict[str, float]
 
 
 class AnalysisReport(BaseModel):
     """Top-level JSON report produced by `alchemia analyze`."""
 
     source_path: str
+    settings: AnalysisSettingsReport
     tables: list[TableProfile]
     keys: list[TableKeyDiscovery]
     joins: list[JoinCandidate]
