@@ -462,7 +462,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       transition:opacity 140ms ease, stroke-width 140ms ease, stroke 140ms ease, filter 140ms ease;
     }
     .edge-layer path.edge-found{stroke:var(--edge-found)}
-    .edge-layer path.edge-missing{stroke:var(--edge-missing); stroke-dasharray:8 6;}
+    .edge-layer path.edge-missing{stroke:var(--edge-missing)}
     .edge-layer path.edge-unexpected{stroke:var(--edge-unexpected)}
     .edge-layer path.edge-unknown{stroke:var(--edge)}
     .edge-layer path.selected{
@@ -977,6 +977,10 @@ DEBUG_SITE_HTML = """<!doctype html>
       return `${left} -> ${right}`;
     }
 
+    function sortStrings(items) {
+      return [...(items || [])].sort((a, b) => String(a).localeCompare(String(b)));
+    }
+
     function dedupeStrings(items) {
       const out = [];
       const seen = new Set();
@@ -1084,13 +1088,24 @@ DEBUG_SITE_HTML = """<!doctype html>
       relationships.forEach((rel) => {
         const leftEl = findColumnElement(canvas, rel.left_table, rel.left_column);
         const rightEl = findColumnElement(canvas, rel.right_table, rel.right_column);
-        if (!leftEl || !rightEl) return;
+        const leftCard = findTableCard(canvas, rel.left_table);
+        const rightCard = findTableCard(canvas, rel.right_table);
+        if (!leftCard || !rightCard) return;
 
-        const a = leftEl.getBoundingClientRect();
-        const b = rightEl.getBoundingClientRect();
-        const x1 = a.right - rect.left;
+        const leftAnchor =
+          leftEl ||
+          leftCard.querySelector(".table-head") ||
+          leftCard;
+        const rightAnchor =
+          rightEl ||
+          rightCard.querySelector(".table-head") ||
+          rightCard;
+
+        const a = leftAnchor.getBoundingClientRect();
+        const b = rightAnchor.getBoundingClientRect();
+        const x1 = (leftEl ? a.right : a.left + a.width * 0.95) - rect.left;
         const y1 = a.top + a.height / 2 - rect.top;
-        const x2 = b.left - rect.left;
+        const x2 = (rightEl ? b.left : b.left + b.width * 0.05) - rect.left;
         const y2 = b.top + b.height / 2 - rect.top;
         const bend = clamp((x2 - x1) * 0.5, 60, 220);
         const leftRef = `${rel.left_table}.${rel.left_column}`;
@@ -1142,6 +1157,14 @@ DEBUG_SITE_HTML = """<!doctype html>
         for (const col of cols) {
           if (col.dataset.column === columnName) return col;
         }
+      }
+      return null;
+    }
+
+    function findTableCard(canvas, tableName) {
+      const cards = canvas.querySelectorAll(".table-card");
+      for (const card of cards) {
+        if (card.dataset.table === tableName) return card;
       }
       return null;
     }
@@ -1390,9 +1413,12 @@ DEBUG_SITE_HTML = """<!doctype html>
 
       setMetric("covThreshold", state.threshold.toFixed(2));
       const predictedJoins = state.payload.report.joins || [];
+      const predictedAtThreshold = predictedJoins.filter(
+        (join) => Number(join.confidence || 0) >= state.threshold
+      );
       if (!manifest) {
         const predictedMap = new Map();
-        predictedJoins.forEach((join) => {
+        predictedAtThreshold.forEach((join) => {
           const left = `${join.left_table}.${join.left_column}`;
           const right = `${join.right_table}.${join.right_column}`;
           predictedMap.set(relationKey(left, right), joinDisplay(left, right));
@@ -1405,48 +1431,49 @@ DEBUG_SITE_HTML = """<!doctype html>
         setMetric("covRecall", "0.0%");
         setMetric("covPrecision", "0.0%");
         const noManifest = ["No manifest.json found in analyzed folder."];
-        setRail("joinsFoundList", predictedMap.size ? Array.from(predictedMap.values()) : noManifest);
+        setRail("joinsFoundList", predictedMap.size ? sortStrings(Array.from(predictedMap.values())) : noManifest);
         setRail("missingJoinsList", noManifest);
         setRail("unexpectedJoinsList", noManifest);
-        state.relationshipPool = buildRelationshipPool(new Map(), predictedJoins, false);
+        state.relationshipPool = buildRelationshipPool(new Map(), predictedAtThreshold, false);
         return;
       }
 
       const ground = manifest.ground_truth || {};
       const coreRelations = ground.core_relationships || ground.core_relationshpis || [];
       const expectedMap = collectExpectedJoins(manifest, coreRelations);
-      state.relationshipPool = buildRelationshipPool(expectedMap, predictedJoins, true);
-      const active = activeRelationships();
-      const activeMap = new Map();
-      active.forEach((rel) => {
-        activeMap.set(rel.key, rel.display);
+      state.relationshipPool = buildRelationshipPool(expectedMap, predictedAtThreshold, true);
+      const predictedMap = new Map();
+      predictedAtThreshold.forEach((join) => {
+        const left = `${join.left_table}.${join.left_column}`;
+        const right = `${join.right_table}.${join.right_column}`;
+        predictedMap.set(relationKey(left, right), joinDisplay(left, right));
       });
       const expectedKeys = new Set(expectedMap.keys());
-      const predictedKeys = new Set(activeMap.keys());
+      const predictedKeys = new Set(predictedMap.keys());
       const found = Array.from(expectedMap.entries())
         .filter(([key]) => predictedKeys.has(key))
         .map(([, info]) => info.display);
       const missing = Array.from(expectedMap.entries())
         .filter(([key]) => !predictedKeys.has(key))
         .map(([, info]) => info.display);
-      const unexpected = Array.from(activeMap.entries())
+      const unexpected = Array.from(predictedMap.entries())
         .filter(([key]) => !expectedKeys.has(key))
         .map(([, label]) => label);
 
       const recall = expectedMap.size === 0 ? 0 : found.length / expectedMap.size;
-      const precision = activeMap.size === 0 ? 0 : found.length / activeMap.size;
+      const precision = predictedMap.size === 0 ? 0 : found.length / predictedMap.size;
 
       setMetric("covExpected", expectedMap.size);
-      setMetric("covPredicted", activeMap.size);
+      setMetric("covPredicted", predictedMap.size);
       setMetric("covFound", found.length);
       setMetric("covMissing", missing.length);
       setMetric("covUnexpected", unexpected.length);
       setMetric("covRecall", `${(recall * 100).toFixed(1)}%`);
       setMetric("covPrecision", `${(precision * 100).toFixed(1)}%`);
 
-      setRail("joinsFoundList", found);
-      setRail("missingJoinsList", missing);
-      setRail("unexpectedJoinsList", unexpected);
+      setRail("joinsFoundList", sortStrings(found));
+      setRail("missingJoinsList", sortStrings(missing));
+      setRail("unexpectedJoinsList", sortStrings(unexpected));
     }
 
     async function init() {
@@ -1472,22 +1499,22 @@ DEBUG_SITE_HTML = """<!doctype html>
         state.threshold = Number(slider.value);
         label.textContent = Number(slider.value).toFixed(2);
         state.selectedRelationshipKey = null;
+        renderGroundTruth();
         renderTableList();
         renderDiagram();
-        renderGroundTruth();
       });
       searchInput.addEventListener("input", () => {
         state.tableQuery = searchInput.value || "";
         state.selectedRelationshipKey = null;
+        renderGroundTruth();
         renderTableList();
         renderDiagram();
-        renderGroundTruth();
       });
       edgeModeSelect.addEventListener("change", () => {
         state.edgeMode = edgeModeSelect.value || "all";
         state.selectedRelationshipKey = null;
-        renderDiagram();
         renderGroundTruth();
+        renderDiagram();
       });
       relayoutBtn.addEventListener("click", () => {
         autoLayoutTables();
@@ -1503,9 +1530,9 @@ DEBUG_SITE_HTML = """<!doctype html>
         state.selectedRelationshipKey = null;
         searchInput.value = "";
         edgeModeSelect.value = "all";
+        renderGroundTruth();
         renderTableList();
         renderDiagram();
-        renderGroundTruth();
       });
 
       window.addEventListener("resize", () => {

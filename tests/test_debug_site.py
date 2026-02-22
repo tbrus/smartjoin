@@ -35,12 +35,12 @@ def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
     assert "__ALCHEMIA_EMBEDDED_DATA__" not in html
     assert "covRecall" in html
     assert "covPrecision" in html
-    assert "expectedJoinsList" in html
+    assert "joinsFoundList" in html
+    assert "missingJoinsList" in html
     assert "unexpectedJoinsList" in html
-    assert "Joins Found But Shouldn't Be" in html
+    assert "Joins Found" in html
     assert "Missing Joins" in html
-    assert "TRUE relationship" in html
-    assert "UNLABELED relationship" in html
+    assert "Unexpected Joins" in html
     assert "edge-unknown" in html
     assert "attachDrag" in html
     assert "Core Relationships" not in html
