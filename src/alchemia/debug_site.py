@@ -170,8 +170,9 @@ DEBUG_SITE_HTML = """<!doctype html>
       --ink:#10212d;
       --muted:#5d7081;
       --edge:#da8a42;
-      --edge-true:#1f9a63;
-      --edge-false:#d44958;
+      --edge-found:#1f9a63;
+      --edge-missing:#d44958;
+      --edge-unexpected:#1c5cb8;
       --accent:#0f7ea8;
       --accent-soft:#d7eef8;
       --card:#ffffff;
@@ -397,18 +398,32 @@ DEBUG_SITE_HTML = """<!doctype html>
       line-height:1.1;
       color:#0f2836;
     }
-    .workspace-grid{
+    .workspace-shell{
       display:grid;
-      grid-template-columns:minmax(0,1fr) 390px;
+      grid-template-columns:minmax(0,1fr) 380px;
       gap:14px;
-      min-height:0;
-      flex:1;
-      overflow:hidden;
+      align-items:flex-start;
+      margin-bottom:14px;
     }
-    .center-pane{
-      display:flex;
-      flex-direction:column;
+    .graph-panel{
+      resize:vertical;
+      overflow:auto;
+      min-height:360px;
+      max-height:72vh;
+      border-radius:16px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.95);
+      box-shadow:var(--shadow-strong);
+      height:100%;
+    }
+    .graph-layout{
       min-height:0;
+    }
+    .graph-panel .canvas-wrap{
+      border:none;
+      background:transparent;
+      min-height:320px;
+      border-radius:14px;
     }
     .canvas-wrap{
       position:relative;
@@ -446,8 +461,9 @@ DEBUG_SITE_HTML = """<!doctype html>
       cursor:pointer;
       transition:opacity 140ms ease, stroke-width 140ms ease, stroke 140ms ease, filter 140ms ease;
     }
-    .edge-layer path.edge-true{stroke:var(--edge-true)}
-    .edge-layer path.edge-false{stroke:var(--edge-false)}
+    .edge-layer path.edge-found{stroke:var(--edge-found)}
+    .edge-layer path.edge-missing{stroke:var(--edge-missing); stroke-dasharray:8 6;}
+    .edge-layer path.edge-unexpected{stroke:var(--edge-unexpected)}
     .edge-layer path.edge-unknown{stroke:var(--edge)}
     .edge-layer path.selected{
       stroke-width:3.5;
@@ -525,13 +541,11 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-radius:16px;
       background:rgba(255,255,255,0.9);
       box-shadow:var(--shadow-strong);
-      display:none;
+      display:flex;
       flex-direction:column;
-      min-height:680px;
+      min-height:260px;
       overflow:hidden;
     }
-    .data-grid.active,.truth-grid.active,.canvas-wrap.active{display:flex}
-    .canvas-wrap.active{display:block}
     .data-toolbar{
       display:flex;
       gap:10px;
@@ -562,7 +576,8 @@ DEBUG_SITE_HTML = """<!doctype html>
       box-shadow:var(--shadow-strong);
       overflow:auto;
       padding:12px;
-      min-height:680px;
+      align-self:stretch;
+      min-height:360px;
     }
     .right-rail h3{
       margin:0 0 10px 0;
@@ -589,8 +604,6 @@ DEBUG_SITE_HTML = """<!doctype html>
     .rail-list{
       font-size:0.79rem;
       line-height:1.42;
-      max-height:185px;
-      overflow:auto;
       padding-right:4px;
     }
     .rail-list ul{
@@ -599,6 +612,12 @@ DEBUG_SITE_HTML = """<!doctype html>
       display:grid;
       gap:4px;
     }
+    .rail-section.found h4{ color:var(--edge-found); }
+    .rail-section.missing h4{ color:var(--edge-missing); }
+    .rail-section.unexpected h4{ color:var(--edge-unexpected); }
+    .rail-section.found .rail-list li{ color:var(--edge-found); }
+    .rail-section.missing .rail-list li{ color:var(--edge-missing); }
+    .rail-section.unexpected .rail-list li{ color:var(--edge-unexpected); }
     .truth-card{
       border:1px solid var(--border);
       border-radius:12px;
@@ -659,27 +678,6 @@ DEBUG_SITE_HTML = """<!doctype html>
       color:var(--muted);
       line-height:1.45;
     }
-    .legend{
-      display:grid;
-      gap:6px;
-      margin-top:4px;
-    }
-    .legend-item{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      font-size:0.75rem;
-      color:var(--muted);
-    }
-    .legend-swatch{
-      width:24px;
-      height:5px;
-      border-radius:999px;
-      background:var(--edge);
-      flex-shrink:0;
-    }
-    .legend-swatch.true{ background:var(--edge-true); }
-    .legend-swatch.false{ background:var(--edge-false); }
     .truth-badge{
       display:inline-block;
       border-radius:999px;
@@ -690,12 +688,17 @@ DEBUG_SITE_HTML = """<!doctype html>
       margin-bottom:7px;
       text-transform:uppercase;
     }
-    .truth-badge.true{
+    .truth-badge.found{
       background:#dff8ea;
       color:#1b7d4e;
       border:1px solid #8fd3ad;
     }
-    .truth-badge.false{
+    .truth-badge.unexpected{
+      background:#e4ecff;
+      color:#1a3b74;
+      border:1px solid #9ab6f6;
+    }
+    .truth-badge.missing{
       background:#ffe6e9;
       color:#a52f3f;
       border:1px solid #efabb5;
@@ -705,6 +708,20 @@ DEBUG_SITE_HTML = """<!doctype html>
       color:#b56026;
       border:1px solid #f0c8a8;
     }
+    .edge-tooltip{
+      position:fixed;
+      pointer-events:none;
+      background:rgba(15,30,50,0.96);
+      color:#f2f6ff;
+      border-radius:12px;
+      padding:10px 14px;
+      box-shadow:0 12px 30px rgba(15,30,50,0.35);
+      font-size:0.82rem;
+      line-height:1.35;
+      z-index:20;
+      max-width:300px;
+      display:none;
+    }
     @keyframes tableIn{
       from{ opacity:0; transform:translateY(8px) scale(0.985); }
       to{ opacity:1; transform:translateY(0) scale(1); }
@@ -713,8 +730,8 @@ DEBUG_SITE_HTML = """<!doctype html>
       .metric-grid{
         grid-template-columns:repeat(4, minmax(90px, 1fr));
       }
-      .workspace-grid{
-        grid-template-columns:minmax(0,1fr);
+      .workspace-shell{
+        grid-template-columns:1fr;
       }
       .right-rail{
         min-height:420px;
@@ -740,10 +757,6 @@ DEBUG_SITE_HTML = """<!doctype html>
     <aside class="sidebar">
       <h1 class="brand">Alchemia Debug Viewer</h1>
       <p class="sub">Relationship map and table previews for debugging inference output.</p>
-      <div class="tabs">
-        <button class="tab active" id="tabDiagram">Relationship Map</button>
-        <button class="tab" id="tabData">Table Samples</button>
-      </div>
       <section class="panel">
         <h3>Filter</h3>
         <div class="control-stack">
@@ -754,11 +767,12 @@ DEBUG_SITE_HTML = """<!doctype html>
           <label class="control-label" for="tableSearch">Table/column search</label>
           <input id="tableSearch" type="text" placeholder="Try: orders, customer_id, payment">
 
-          <label class="control-label" for="edgeMode">Edge mode</label>
+          <label class="control-label" for="edgeMode">Edge type</label>
           <select id="edgeMode">
-            <option value="all">All visible joins</option>
-            <option value="true">Ground-truth joins only</option>
-            <option value="false">Unexpected joins only</option>
+            <option value="all">All relationships</option>
+            <option value="found">Joins Found</option>
+            <option value="missing">Missing Joins</option>
+            <option value="unexpected">Unexpected Joins</option>
           </select>
 
           <div class="tool-row">
@@ -770,20 +784,11 @@ DEBUG_SITE_HTML = """<!doctype html>
           <div class="hint">
             Visible joins: <strong id="visibleJoinCount">0</strong>
           </div>
-          <div class="legend">
-            <div class="legend-item"><span class="legend-swatch true"></span>Ground truth edge</div>
-            <div class="legend-item"><span class="legend-swatch false"></span>Unexpected edge</div>
-            <div class="legend-item"><span class="legend-swatch"></span>Unlabeled edge (no manifest)</div>
-          </div>
         </div>
       </section>
       <section class="panel">
         <h3>Tables</h3>
         <ul id="tableList" class="table-list"></ul>
-      </section>
-      <section class="panel">
-        <h3>Selected Relationship</h3>
-        <div id="relationDetails" class="hint">Click a connection line to inspect details.</div>
       </section>
     </aside>
     <main class="main">
@@ -799,60 +804,43 @@ DEBUG_SITE_HTML = """<!doctype html>
           <div class="metric-card"><span class="metric-label">Threshold</span><span class="metric-value" id="covThreshold">0.75</span></div>
         </div>
       </section>
-      <div class="workspace-grid">
-        <div class="center-pane">
-          <section id="diagramView" class="canvas-wrap active">
-            <div id="diagramCanvas" class="diagram-canvas">
-              <svg id="edgeLayer" class="edge-layer"></svg>
-            </div>
-          </section>
-          <section id="dataView" class="data-grid">
-            <div class="data-toolbar">
-              <label class="control-label" for="tableSelect">Table</label>
-              <select id="tableSelect"></select>
-              <span class="hint" id="tableMeta"></span>
-            </div>
-            <div id="tablePreview" class="table-preview"></div>
-          </section>
+      <div class="workspace-shell">
+        <div class="graph-layout">
+          <div class="graph-panel">
+            <section id="diagramView" class="canvas-wrap active">
+              <div id="diagramCanvas" class="diagram-canvas">
+                <svg id="edgeLayer" class="edge-layer"></svg>
+              </div>
+            </section>
+          </div>
         </div>
         <aside class="right-rail">
-          <h3>Ground Truth and Evaluation</h3>
-          <section class="rail-section">
-            <h4>Expected Joins</h4>
-            <div class="rail-list" id="expectedJoinsList"></div>
-          </section>
-          <section class="rail-section">
+          <h3>Evaluation</h3>
+          <section class="rail-section found">
             <h4>Joins Found</h4>
             <div class="rail-list" id="joinsFoundList"></div>
           </section>
-          <section class="rail-section">
+          <section class="rail-section missing">
             <h4>Missing Joins</h4>
             <div class="rail-list" id="missingJoinsList"></div>
           </section>
-          <section class="rail-section">
-            <h4>Joins Found But Shouldn't Be</h4>
+          <section class="rail-section unexpected">
+            <h4>Unexpected Joins</h4>
             <div class="rail-list" id="unexpectedJoinsList"></div>
-          </section>
-          <section class="rail-section">
-            <h4>Expected Composite Keys</h4>
-            <div class="rail-list" id="compositeKeysList"></div>
-          </section>
-          <section class="rail-section">
-            <h4>Trap Columns</h4>
-            <div class="rail-list" id="trapColumnsList"></div>
-          </section>
-          <section class="rail-section">
-            <h4>Overlap Traps</h4>
-            <div class="rail-list" id="overlapTrapsList"></div>
-          </section>
-          <section class="rail-section">
-            <h4>Misleading Name Traps</h4>
-            <div class="rail-list" id="nameTrapsList"></div>
           </section>
         </aside>
       </div>
+      <section id="dataView" class="data-grid">
+        <div class="data-toolbar">
+          <label class="control-label" for="tableSelect">Table</label>
+          <select id="tableSelect"></select>
+          <span class="hint" id="tableMeta"></span>
+        </div>
+        <div id="tablePreview" class="table-preview"></div>
+      </section>
     </main>
   </div>
+  <div id="edgeTooltip" class="edge-tooltip">Hover an edge to inspect the relationship.</div>
   <script id="alchemiaEmbeddedData" type="application/json">__ALCHEMIA_EMBEDDED_DATA__</script>
   <script>
     const state = {
@@ -860,12 +848,13 @@ DEBUG_SITE_HTML = """<!doctype html>
       threshold: 0.75,
       tablePositions: {},
       currentRelationships: [],
-      expectedJoinKeys: new Set(),
       matchingTables: new Set(),
       tableQuery: "",
       edgeMode: "all",
       selectedRelationshipKey: null,
+      relationshipPool: [],
     };
+    const tooltipEl = document.getElementById("edgeTooltip");
 
     const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
@@ -875,21 +864,113 @@ DEBUG_SITE_HTML = """<!doctype html>
 
     function activeRelationships() {
       const matchingTables = refreshMatchingTables();
-      return state.payload.report.joins.filter((j) => {
-        if (j.confidence < state.threshold) return false;
+      return state.relationshipPool.filter((rel) => {
+        if (rel.category !== "missing" && rel.confidence < state.threshold) return false;
         if (matchingTables.size > 0) {
-          if (!(matchingTables.has(j.left_table) || matchingTables.has(j.right_table))) {
+          if (!(matchingTables.has(rel.left_table) || matchingTables.has(rel.right_table))) {
             return false;
           }
         }
-        if (state.edgeMode === "true") {
-          return state.expectedJoinKeys.size > 0 && isExpectedRelationship(j);
-        }
-        if (state.edgeMode === "false") {
-          return state.expectedJoinKeys.size > 0 && !isExpectedRelationship(j);
+        if (state.edgeMode !== "all" && rel.category !== state.edgeMode) {
+          return false;
         }
         return true;
       });
+    }
+
+    function splitRef(ref) {
+      if (!ref || typeof ref !== "string") return { table: "", column: "" };
+      const dotIndex = ref.indexOf(".");
+      if (dotIndex < 0) return { table: ref.trim(), column: "" };
+      return {
+        table: ref.slice(0, dotIndex).trim(),
+        column: ref.slice(dotIndex + 1).trim(),
+      };
+    }
+
+    function annotateJoin(join, expectedKeys, hasGroundTruth) {
+      const left = `${join.left_table}.${join.left_column}`;
+      const right = `${join.right_table}.${join.right_column}`;
+      const key = relationKey(left, right);
+      let category = expectedKeys.has(key) ? "found" : "unexpected";
+      if (!hasGroundTruth) category = "found";
+      return {
+        ...join,
+        key,
+        display: joinDisplay(left, right),
+        category,
+      };
+    }
+
+    function buildMissingRelationship(info, key) {
+      return {
+        left_table: info.left_table,
+        left_column: info.left_column,
+        right_table: info.right_table,
+        right_column: info.right_column,
+        confidence: 1,
+        relationship_guess: info.relationship_guess || "ground_truth",
+        breakdown: { signals: {}, weights: {}, weighted_score: 0 },
+        category: "missing",
+        display: info.display,
+        key,
+      };
+    }
+
+    function buildRelationshipPool(expectedMap, predictedJoins, hasGroundTruth) {
+      const expectedKeys = expectedMap ? new Set(expectedMap.keys()) : new Set();
+      const predictedKeys = new Set();
+      const pool = predictedJoins.map((join) => {
+        const annotated = annotateJoin(join, expectedKeys, hasGroundTruth);
+        predictedKeys.add(annotated.key);
+        return annotated;
+      });
+      if (expectedMap && expectedMap.size > 0) {
+        expectedMap.forEach((info, key) => {
+          if (!predictedKeys.has(key)) {
+            pool.push(buildMissingRelationship(info, key));
+          }
+        });
+      }
+      return pool;
+    }
+
+    function formatTooltipContent(rel, truthState) {
+      const left = `${rel.left_table}.${rel.left_column}`;
+      const right = `${rel.right_table}.${rel.right_column}`;
+      const labelMap = {
+        found: "Join Found",
+        missing: "Missing Join",
+        unexpected: "Unexpected Join",
+        unknown: "Unlabeled Join",
+      };
+      const label = labelMap[truthState] || labelMap.unknown;
+      const signals = Object.entries(rel.breakdown?.signals || {})
+        .map(([k, v]) => `<div><strong>${k}</strong>: ${Number(v).toFixed(3)}</div>`)
+        .join("");
+      return `
+        <div style="font-weight:600; margin-bottom:4px;">${label}</div>
+        <div>${left} → ${right}</div>
+        <div style="margin-top:6px; font-size:0.78rem;">confidence: ${rel.confidence.toFixed(3)}</div>
+        <div style="font-size:0.78rem;">relationship: ${rel.relationship_guess}</div>
+        ${signals ? `<div style="margin-top:6px; font-size:0.75rem;">${signals}</div>` : ""}
+      `;
+    }
+
+    function positionTooltip(event) {
+      if (!tooltipEl) return;
+      const offset = 12;
+      const x = event.clientX + offset;
+      const y = event.clientY + offset;
+      tooltipEl.style.left = `${x}px`;
+      tooltipEl.style.top = `${y}px`;
+    }
+
+    function showTooltip(rel, truthState, event) {
+      if (!tooltipEl) return;
+      tooltipEl.innerHTML = formatTooltipContent(rel, truthState);
+      positionTooltip(event);
+      tooltipEl.style.display = "block";
     }
 
     function joinDisplay(left, right) {
@@ -922,14 +1003,6 @@ DEBUG_SITE_HTML = """<!doctype html>
       });
       state.matchingTables = set;
       return set;
-    }
-
-    function isExpectedRelationship(rel) {
-      const key = relationKey(
-        `${rel.left_table}.${rel.left_column}`,
-        `${rel.right_table}.${rel.right_column}`
-      );
-      return state.expectedJoinKeys.has(key);
     }
 
     function relationshipColumnsByTable() {
@@ -1023,10 +1096,15 @@ DEBUG_SITE_HTML = """<!doctype html>
         const leftRef = `${rel.left_table}.${rel.left_column}`;
         const rightRef = `${rel.right_table}.${rel.right_column}`;
         const relKey = relationKey(leftRef, rightRef);
-        const hasGroundTruth = state.expectedJoinKeys.size > 0;
-        const isTrue = hasGroundTruth && state.expectedJoinKeys.has(relKey);
-        const isFalse = hasGroundTruth && !isTrue;
-        const truthState = isTrue ? "true" : (isFalse ? "false" : "unknown");
+        const category = rel.category || "unknown";
+        const truthState =
+          category === "missing"
+            ? "missing"
+            : category === "unexpected"
+            ? "unexpected"
+            : category === "found"
+            ? "found"
+            : "unknown";
 
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`);
@@ -1040,21 +1118,18 @@ DEBUG_SITE_HTML = """<!doctype html>
         path.addEventListener("click", () => {
           state.selectedRelationshipKey = relKey;
           drawEdges(state.currentRelationships, canvas, edgeLayer);
-          const details = document.getElementById("relationDetails");
-          const signals = Object.entries(rel.breakdown.signals || {})
-            .map(([k, v]) => `${k}: ${Number(v).toFixed(3)}`)
-            .join("<br>");
-          const truthBadge = hasGroundTruth
-            ? `<span class="truth-badge ${truthState}">${isTrue ? "TRUE relationship" : "FALSE relationship"}</span><br>`
-            : `<span class="truth-badge unknown">UNLABELED relationship</span><br>`;
-          details.innerHTML = `
-            ${truthBadge}
-            <strong>${rel.left_table}.${rel.left_column}</strong> -> <strong>${rel.right_table}.${rel.right_column}</strong><br>
-            confidence: <strong>${rel.confidence.toFixed(3)}</strong><br>
-            relationship: ${rel.relationship_guess}<br><br>
-            ${signals}
-          `;
         });
+        if (tooltipEl) {
+          path.addEventListener("pointerenter", (event) => {
+            showTooltip(rel, truthState, event);
+          });
+          path.addEventListener("pointermove", (event) => {
+            positionTooltip(event);
+          });
+          path.addEventListener("pointerleave", () => {
+            tooltipEl.style.display = "none";
+          });
+        }
         edgeLayer.appendChild(path);
       });
     }
@@ -1261,99 +1336,45 @@ DEBUG_SITE_HTML = """<!doctype html>
 
     function collectExpectedJoins(manifest, coreRelations) {
       const expected = new Map();
+
+      function pushRefs(leftRef, rightRef, guess) {
+        const left = splitRef(leftRef);
+        const right = splitRef(rightRef);
+        if (!left.table || !left.column || !right.table || !right.column) return;
+        const leftRefClean = `${left.table}.${left.column}`;
+        const rightRefClean = `${right.table}.${right.column}`;
+        const key = relationKey(leftRefClean, rightRefClean);
+        if (expected.has(key)) return;
+        expected.set(key, {
+          display: joinDisplay(leftRefClean, rightRefClean),
+          left_table: left.table,
+          left_column: left.column,
+          right_table: right.table,
+          right_column: right.column,
+          relationship_guess: guess || "ground_truth",
+        });
+      }
+
       (coreRelations || []).forEach((rel) => {
         if (!rel || typeof rel !== "object") return;
-        const left = `${rel.from_table}.${rel.from_column}`;
-        const right = `${rel.to_table}.${rel.to_column}`;
+        const left = `${String(rel.from_table || rel.fromTable || "").trim()}.${String(rel.from_column || rel.fromColumn || "").trim()}`;
+        const right = `${String(rel.to_table || rel.toTable || "").trim()}.${String(rel.to_column || rel.toColumn || "").trim()}`;
         if (left.includes("undefined") || right.includes("undefined")) return;
-        expected.set(relationKey(left, right), joinDisplay(left, right));
+        pushRefs(left, right, rel.relationship_guess || rel.relationship || "ground_truth");
       });
       ((manifest && manifest.expected_joins) || []).forEach((item) => {
         if (typeof item === "object" && item !== null) {
-          const left = `${item.from_table}.${item.from_column}`;
-          const right = `${item.to_table}.${item.to_column}`;
+          const left = `${String(item.from_table || item.fromTable || "").trim()}.${String(item.from_column || item.fromColumn || "").trim()}`;
+          const right = `${String(item.to_table || item.toTable || "").trim()}.${String(item.to_column || item.toColumn || "").trim()}`;
           if (left.includes("undefined") || right.includes("undefined")) return;
-          expected.set(relationKey(left, right), joinDisplay(left, right));
+          pushRefs(left, right, item.relationship_guess || item.relationship || "ground_truth");
           return;
         }
         const parsed = parseJoinText(String(item));
         if (!parsed) return;
-        expected.set(relationKey(parsed.left, parsed.right), joinDisplay(parsed.left, parsed.right));
+        pushRefs(parsed.left, parsed.right, "ground_truth");
       });
       return expected;
-    }
-
-    function formatCompositeKey(item) {
-      if (typeof item === "string") return item.trim();
-      if (!item || typeof item !== "object") return "";
-      const table = String(item.table || item.table_name || "").trim();
-      const columns = Array.isArray(item.columns) ? item.columns.map((x) => String(x).trim()).filter(Boolean) : [];
-      if (!table || columns.length === 0) return "";
-      return `${table}(${columns.join(", ")})`;
-    }
-
-    function collectCompositeKeys(manifest, ground) {
-      const out = [];
-      ((manifest && manifest.expected_composite_keys) || []).forEach((item) => {
-        const label = formatCompositeKey(item);
-        if (label) out.push(label);
-      });
-      ((ground && ground.composite_key_candidates) || []).forEach((item) => {
-        const label = formatCompositeKey(item);
-        if (label) out.push(label);
-      });
-      return dedupeStrings(out);
-    }
-
-    function collectTrapColumns(manifest, ground) {
-      const traps = (ground && ground.traps) || {};
-      const out = []
-        .concat((manifest && manifest.trap_columns) || [])
-        .concat(traps.shared_low_cardinality_columns || [])
-        .concat(traps.date_like_columns || []);
-      return dedupeStrings(out);
-    }
-
-    function collectOverlapTraps(ground) {
-      const traps = (ground && ground.traps && ground.traps.overlapping_value_traps) || [];
-      const out = [];
-      traps.forEach((trap) => {
-        if (!trap || typeof trap !== "object") return;
-        const columns = Array.isArray(trap.columns)
-          ? trap.columns.map((col) => String(col).trim()).filter(Boolean).join(" <-> ")
-          : String(trap.columns || "").trim();
-        if (!columns) return;
-        const overlap = trap.expected_overlap ? ` (${String(trap.expected_overlap).trim()})` : "";
-        const reason = trap.reason ? ` - ${String(trap.reason).trim()}` : "";
-        out.push(`${columns}${overlap}${reason}`);
-      });
-      return dedupeStrings(out);
-    }
-
-    function collectMisleadingNameTraps(ground) {
-      const traps = (ground && ground.traps && ground.traps.misleading_name_pairs) || [];
-      const out = [];
-      traps.forEach((pair) => {
-        if (!pair || typeof pair !== "object") return;
-        const left = String(pair.left || "").trim();
-        const right = String(pair.right || "").trim();
-        if (!left || !right) return;
-        const reason = pair.reason ? ` - ${String(pair.reason).trim()}` : "";
-        out.push(`${left} vs ${right}${reason}`);
-      });
-      return dedupeStrings(out);
-    }
-
-    function refreshExpectedJoinKeys() {
-      const manifest = state.payload?.manifest;
-      if (!manifest) {
-        state.expectedJoinKeys = new Set();
-        return;
-      }
-      const ground = manifest.ground_truth || {};
-      const coreRelations = ground.core_relationships || ground.core_relationshpis || [];
-      const expectedMap = collectExpectedJoins(manifest, coreRelations);
-      state.expectedJoinKeys = new Set(expectedMap.keys());
     }
 
     function renderGroundTruth() {
@@ -1368,93 +1389,64 @@ DEBUG_SITE_HTML = """<!doctype html>
       };
 
       setMetric("covThreshold", state.threshold.toFixed(2));
-
+      const predictedJoins = state.payload.report.joins || [];
       if (!manifest) {
-        state.expectedJoinKeys = new Set();
+        const predictedMap = new Map();
+        predictedJoins.forEach((join) => {
+          const left = `${join.left_table}.${join.left_column}`;
+          const right = `${join.right_table}.${join.right_column}`;
+          predictedMap.set(relationKey(left, right), joinDisplay(left, right));
+        });
         setMetric("covExpected", 0);
-        setMetric("covPredicted", state.currentRelationships.length);
-        setMetric("covFound", 0);
+        setMetric("covPredicted", predictedMap.size);
+        setMetric("covFound", predictedMap.size);
         setMetric("covMissing", 0);
         setMetric("covUnexpected", 0);
         setMetric("covRecall", "0.0%");
         setMetric("covPrecision", "0.0%");
         const noManifest = ["No manifest.json found in analyzed folder."];
-        setRail("expectedJoinsList", noManifest);
-        setRail("joinsFoundList", noManifest);
+        setRail("joinsFoundList", predictedMap.size ? Array.from(predictedMap.values()) : noManifest);
         setRail("missingJoinsList", noManifest);
         setRail("unexpectedJoinsList", noManifest);
-        setRail("compositeKeysList", noManifest);
-        setRail("trapColumnsList", noManifest);
-        setRail("overlapTrapsList", noManifest);
-        setRail("nameTrapsList", noManifest);
+        state.relationshipPool = buildRelationshipPool(new Map(), predictedJoins, false);
         return;
       }
 
       const ground = manifest.ground_truth || {};
       const coreRelations = ground.core_relationships || ground.core_relationshpis || [];
       const expectedMap = collectExpectedJoins(manifest, coreRelations);
-      state.expectedJoinKeys = new Set(expectedMap.keys());
-
-      const predictedMap = new Map();
-      activeRelationships().forEach((join) => {
-        const left = `${join.left_table}.${join.left_column}`;
-        const right = `${join.right_table}.${join.right_column}`;
-        predictedMap.set(relationKey(left, right), joinDisplay(left, right));
+      state.relationshipPool = buildRelationshipPool(expectedMap, predictedJoins, true);
+      const active = activeRelationships();
+      const activeMap = new Map();
+      active.forEach((rel) => {
+        activeMap.set(rel.key, rel.display);
       });
-
       const expectedKeys = new Set(expectedMap.keys());
-      const predictedKeys = new Set(predictedMap.keys());
+      const predictedKeys = new Set(activeMap.keys());
       const found = Array.from(expectedMap.entries())
         .filter(([key]) => predictedKeys.has(key))
-        .map(([, label]) => label);
+        .map(([, info]) => info.display);
       const missing = Array.from(expectedMap.entries())
         .filter(([key]) => !predictedKeys.has(key))
-        .map(([, label]) => label);
-      const unexpected = Array.from(predictedMap.entries())
+        .map(([, info]) => info.display);
+      const unexpected = Array.from(activeMap.entries())
         .filter(([key]) => !expectedKeys.has(key))
         .map(([, label]) => label);
-      const predictedList = Array.from(predictedMap.values());
 
       const recall = expectedMap.size === 0 ? 0 : found.length / expectedMap.size;
-      const precision = predictedMap.size === 0 ? 0 : found.length / predictedMap.size;
-      const compositeKeys = collectCompositeKeys(manifest, ground);
-      const trapColumns = collectTrapColumns(manifest, ground);
-      const overlapTrapLines = collectOverlapTraps(ground);
-      const misleadingLines = collectMisleadingNameTraps(ground);
+      const precision = activeMap.size === 0 ? 0 : found.length / activeMap.size;
 
       setMetric("covExpected", expectedMap.size);
-      setMetric("covPredicted", predictedMap.size);
+      setMetric("covPredicted", activeMap.size);
       setMetric("covFound", found.length);
       setMetric("covMissing", missing.length);
       setMetric("covUnexpected", unexpected.length);
       setMetric("covRecall", `${(recall * 100).toFixed(1)}%`);
       setMetric("covPrecision", `${(precision * 100).toFixed(1)}%`);
 
-      setRail("expectedJoinsList", Array.from(expectedMap.values()));
-      setRail("joinsFoundList", predictedList);
+      setRail("joinsFoundList", found);
       setRail("missingJoinsList", missing);
       setRail("unexpectedJoinsList", unexpected);
-      setRail("compositeKeysList", compositeKeys);
-      setRail("trapColumnsList", trapColumns);
-      setRail("overlapTrapsList", overlapTrapLines);
-      setRail("nameTrapsList", misleadingLines);
-    }
-
-    function setActiveView(view) {
-      const tabIds = ["tabDiagram", "tabData"];
-      const viewIds = ["diagramView", "dataView"];
-      tabIds.forEach((id) => document.getElementById(id).classList.remove("active"));
-      viewIds.forEach((id) => document.getElementById(id).classList.remove("active"));
-      document.getElementById(`tab${view}`).classList.add("active");
-      document.getElementById(`${view.toLowerCase()}View`).classList.add("active");
-    }
-
-    function switchToDiagram() {
-      setActiveView("Diagram");
-    }
-
-    function switchToData() {
-      setActiveView("Data");
     }
 
     async function init() {
@@ -1466,7 +1458,6 @@ DEBUG_SITE_HTML = """<!doctype html>
         const response = await fetch("data.json");
         state.payload = await response.json();
       }
-      refreshExpectedJoinKeys();
       const slider = document.getElementById("confidenceRange");
       const label = document.getElementById("confidenceLabel");
       const searchInput = document.getElementById("tableSearch");
@@ -1523,15 +1514,12 @@ DEBUG_SITE_HTML = """<!doctype html>
         drawEdges(state.currentRelationships, canvas, edgeLayer);
       });
 
-      document.getElementById("tabDiagram").addEventListener("click", switchToDiagram);
-      document.getElementById("tabData").addEventListener("click", switchToData);
-
+      renderGroundTruth();
       renderTableList();
       renderTableSelect();
       autoLayoutTables();
       renderDiagram();
       fitVisibleTables();
-      renderGroundTruth();
     }
 
     init().catch((err) => {
