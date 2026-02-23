@@ -2,7 +2,7 @@
   <img src="docs/logo.png">
 </p>
 
-# smartjoin: data relationship discovery in seconds
+# <span style="color: #20b5dd;">smart</span><span style="color: #81cb8b;">join</span>: data relationship discovery in seconds
 
 Stop guessing how your tables connect. **smartjoin automatically discovers relationships between datasets** — no schema, no docs, no manual SQL detective work.
 
