@@ -10,7 +10,6 @@ Perfect for when your data looks like this:
 
 > *“What the hell is `cust_id_2`?”* 😵
 
----
 
 ## ✨ What SmartJoin does
 
@@ -23,7 +22,6 @@ payments.order_id  -> orders.id    (confidence: 0.98)
 
 It works on raw files, messy tables, and unknown schemas.
 
----
 
 ## 🎯 Who is this for?
 
@@ -35,7 +33,6 @@ SmartJoin is built for people who live in data chaos:
 * 🧾 **Due diligence / consulting teams**
 * 🚀 **Startups with messy data**
 
----
 
 ## ⚡ Quick Demo
 
@@ -52,7 +49,6 @@ orders.customer_id -> customers.id (confidence: 0.95)
 payments.order_id  -> orders.id    (confidence: 0.98)
 ```
 
----
 
 ## 🐼 Pandas Integration
 
@@ -65,7 +61,6 @@ df.auto_join(other_df)
 No need to remember join keys. SmartJoin figures them out for you.
 
 
----
 
 ## 🧠 How it works (high level)
 
@@ -78,17 +73,15 @@ SmartJoin uses:
 
 to infer relationships automatically.
 
----
 
 ## 🔥 Why SmartJoin?
 
-✅ Zero schema knowledge required
-✅ Works on messy real-world data
-✅ Confidence scores for every relationship
-✅ Designed for speed & exploration
-✅ Perfect for EDA and reverse-engineering databases
+✅ Zero schema knowledge required  
+✅ Works on messy real-world data  
+✅ Confidence scores for every relationship  
+✅ Designed for speed & exploration  
+✅ Perfect for EDA and reverse-engineering databases  
 
----
 
 ## 📦 Installation (example)
 
@@ -96,14 +89,12 @@ to infer relationships automatically.
 pip install smartjoin
 ```
 
----
 
 ## 🤝 Contributing
 
 Contributions welcome!
 If SmartJoin saved you from manual joins, give it a ⭐️
 
----
 
 ## 📜 License
 
