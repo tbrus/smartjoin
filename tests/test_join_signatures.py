@@ -2,8 +2,8 @@ from pathlib import Path
 
 import polars as pl
 
-from alchemia.joins import build_column_signatures
-from alchemia.models import Table
+from smartjoin.joins import build_column_signatures
+from smartjoin.models import Table
 
 
 def test_build_column_signatures_is_deterministic_for_same_seed() -> None:

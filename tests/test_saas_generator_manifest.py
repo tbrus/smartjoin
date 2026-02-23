@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from alchemia.analysis import analyze_path
+from smartjoin.analysis import analyze_path
 
 
 def test_saas_generator_writes_ground_truth_and_traps(tmp_path: Path) -> None:
@@ -13,7 +13,7 @@ def test_saas_generator_writes_ground_truth_and_traps(tmp_path: Path) -> None:
     subprocess.run(
         [
             sys.executable,
-            "scripts/generate_alchemia_saas_testdata.py",
+            "scripts/generate_smartjoin_saas_testdata.py",
             "--out-dir",
             str(out_dir),
             "--seed",
@@ -77,7 +77,7 @@ def test_saas_generator_core_join_recall(tmp_path: Path) -> None:
     subprocess.run(
         [
             sys.executable,
-            "scripts/generate_alchemia_saas_testdata.py",
+            "scripts/generate_smartjoin_saas_testdata.py",
             "--out-dir",
             str(out_dir),
             "--seed",

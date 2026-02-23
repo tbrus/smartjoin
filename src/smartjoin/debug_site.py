@@ -1,4 +1,4 @@
-﻿"""Static debug site generator for relationship inspection."""
+"""Static debug site generator for relationship inspection."""
 
 # ruff: noqa: E501
 
@@ -10,9 +10,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from alchemia.analysis import analyze_path
-from alchemia.ingestion import load_tables
-from alchemia.models import AnalysisReport
+from smartjoin.analysis import analyze_path
+from smartjoin.ingestion import load_tables
+from smartjoin.models import AnalysisReport
 
 
 def _jsonable(value: Any) -> Any:
@@ -159,7 +159,7 @@ DEBUG_SITE_HTML = """<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Alchemia Debug Viewer</title>
+  <title>Smartjoin Debug Viewer</title>
   <style>
     :root{
       --bg:#edf3f9;
@@ -755,7 +755,7 @@ DEBUG_SITE_HTML = """<!doctype html>
 <body>
   <div class="shell">
     <aside class="sidebar">
-      <h1 class="brand">Alchemia Debug Viewer</h1>
+      <h1 class="brand">Smartjoin Debug Viewer</h1>
       <p class="sub">Relationship map and table previews for debugging inference output.</p>
       <section class="panel">
         <h3>Filter</h3>
@@ -841,7 +841,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     </main>
   </div>
   <div id="edgeTooltip" class="edge-tooltip">Hover an edge to inspect the relationship.</div>
-  <script id="alchemiaEmbeddedData" type="application/json">__ALCHEMIA_EMBEDDED_DATA__</script>
+  <script id="smartjoinEmbeddedData" type="application/json">__SMARTJOIN_EMBEDDED_DATA__</script>
   <script>
     const state = {
       payload: null,
@@ -1477,7 +1477,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
 
     async function init() {
-      const embedded = document.getElementById("alchemiaEmbeddedData");
+      const embedded = document.getElementById("smartjoinEmbeddedData");
       const embeddedText = embedded?.textContent?.trim() || "";
       if (embeddedText) {
         state.payload = JSON.parse(embeddedText);
@@ -1608,7 +1608,7 @@ def build_debug_site(
     data_path = out_dir / "data.json"
     payload_json = json.dumps(_jsonable(payload), indent=2, allow_nan=False)
     embedded_payload = payload_json.replace("</", "<\\/")
-    rendered_html = DEBUG_SITE_HTML.replace("__ALCHEMIA_EMBEDDED_DATA__", embedded_payload)
+    rendered_html = DEBUG_SITE_HTML.replace("__SMARTJOIN_EMBEDDED_DATA__", embedded_payload)
     index_path.write_text(rendered_html, encoding="utf-8")
     data_path.write_text(payload_json, encoding="utf-8")
     return index_path, data_path

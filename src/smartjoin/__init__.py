@@ -1,4 +1,4 @@
-"""Alchemia package."""
+"""Smartjoin package."""
 
 __all__ = ["__version__"]
 

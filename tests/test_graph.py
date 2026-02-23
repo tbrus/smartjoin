@@ -2,9 +2,9 @@ from pathlib import Path
 
 import polars as pl
 
-from alchemia.graphing import build_join_graph, graph_to_report
-from alchemia.joins import find_join_candidates
-from alchemia.models import JoinCandidate, JoinScoreBreakdown, Table
+from smartjoin.graphing import build_join_graph, graph_to_report
+from smartjoin.joins import find_join_candidates
+from smartjoin.models import JoinCandidate, JoinScoreBreakdown, Table
 
 
 def test_build_join_graph_returns_nodes_and_edges() -> None:

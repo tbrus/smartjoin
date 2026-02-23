@@ -2,7 +2,7 @@ from pathlib import Path
 
 import polars as pl
 
-from alchemia.analysis import analyze_path
+from smartjoin.analysis import analyze_path
 
 
 def test_analysis_report_includes_settings_dump(tmp_path: Path) -> None:

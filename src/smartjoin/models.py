@@ -131,7 +131,7 @@ class AnalysisSettingsReport(BaseModel):
 
 
 class AnalysisReport(BaseModel):
-    """Top-level JSON report produced by `alchemia analyze`."""
+    """Top-level JSON report produced by `smartjoin analyze`."""
 
     source_path: str
     settings: AnalysisSettingsReport

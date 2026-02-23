@@ -8,7 +8,7 @@ from typing import Any
 
 import polars as pl
 
-from alchemia.models import Table
+from smartjoin.models import Table
 
 SUPPORTED_EXTENSIONS = {".csv", ".parquet", ".xlsx", ".json"}
 DEFAULT_EXCLUDED_STEMS = {"manifest", "report", "graph"}

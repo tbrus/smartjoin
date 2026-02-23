@@ -3,13 +3,13 @@ requires = ["hatchling>=1.24.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "alchemia"
+name = "smartjoin"
 version = "0.1.0"
 description = "Deterministic relational inference engine for structured datasets."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "Alchemia contributors" }]
+authors = [{ name = "Smartjoin contributors" }]
 dependencies = [
   "polars>=1.10.0",
   "pandas>=2.2.0",
@@ -27,7 +27,7 @@ dev = [
 ]
 
 [project.scripts]
-alchemia = "alchemia.cli:main"
+smartjoin = "smartjoin.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

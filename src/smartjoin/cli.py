@@ -1,4 +1,4 @@
-"""CLI entrypoint for Alchemia."""
+"""CLI entrypoint for Smartjoin."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from typing import Annotated
 
 import typer
 
-from alchemia.analysis import analyze_path, build_graph_report, export_sql
-from alchemia.debug_site import build_debug_site
+from smartjoin.analysis import analyze_path, build_graph_report, export_sql
+from smartjoin.debug_site import build_debug_site
 
-app = typer.Typer(help="Alchemia: deterministic relational inference engine.")
+app = typer.Typer(help="Smartjoin: deterministic relational inference engine.")
 
 
 def _parse_assignments(values: list[str], label: str) -> dict[str, str]:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import polars as pl
 
-from alchemia.models import Table, TableKeyDiscovery
+from smartjoin.models import Table, TableKeyDiscovery
 
 
 def _sql_type(dtype: pl.DataType) -> str:

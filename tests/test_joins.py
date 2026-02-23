@@ -2,8 +2,8 @@ from pathlib import Path
 
 import polars as pl
 
-from alchemia.joins import find_join_candidates
-from alchemia.models import Table
+from smartjoin.joins import find_join_candidates
+from smartjoin.models import Table
 
 
 def test_find_join_candidates_detects_high_inclusion_foreign_key_pattern() -> None:

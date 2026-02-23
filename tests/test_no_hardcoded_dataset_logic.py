@@ -8,10 +8,10 @@ def test_core_inference_modules_do_not_embed_dataset_table_names() -> None:
     """
     root = Path(__file__).resolve().parents[1]
     core_files = [
-        root / "src" / "alchemia" / "joins" / "discovery.py",
-        root / "src" / "alchemia" / "keys" / "discovery.py",
-        root / "src" / "alchemia" / "profiling" / "profiler.py",
-        root / "src" / "alchemia" / "graphing.py",
+        root / "src" / "smartjoin" / "joins" / "discovery.py",
+        root / "src" / "smartjoin" / "keys" / "discovery.py",
+        root / "src" / "smartjoin" / "profiling" / "profiler.py",
+        root / "src" / "smartjoin" / "graphing.py",
     ]
     forbidden_tokens = [
         "customers",

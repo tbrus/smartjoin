@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable
 
-from alchemia.models import JoinCandidate
+from smartjoin.models import JoinCandidate
 
 PluginFn = Callable[[list[JoinCandidate]], list[JoinCandidate]]
 

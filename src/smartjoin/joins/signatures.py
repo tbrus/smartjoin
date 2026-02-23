@@ -10,7 +10,7 @@ from typing import Any
 
 import polars as pl
 
-from alchemia.models import Table
+from smartjoin.models import Table
 
 
 @dataclass(frozen=True)

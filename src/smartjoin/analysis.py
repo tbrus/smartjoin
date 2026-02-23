@@ -4,20 +4,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from alchemia.config import (
+from smartjoin.config import (
     DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
     DEFAULT_NEAR_UNIQUE_THRESHOLD,
     AnalysisSettings,
     merge_date_caps,
 )
-from alchemia.exporters import build_sql_skeleton
-from alchemia.graphing import build_join_graph, graph_to_report
-from alchemia.ingestion import load_tables
-from alchemia.joins import find_join_candidates
-from alchemia.keys import discover_keys
-from alchemia.models import AnalysisReport, AnalysisSettingsReport, JoinGraphReport
-from alchemia.profiling import profile_tables
-from alchemia.semantics import apply_semantics_plugin
+from smartjoin.exporters import build_sql_skeleton
+from smartjoin.graphing import build_join_graph, graph_to_report
+from smartjoin.ingestion import load_tables
+from smartjoin.joins import find_join_candidates
+from smartjoin.keys import discover_keys
+from smartjoin.models import AnalysisReport, AnalysisSettingsReport, JoinGraphReport
+from smartjoin.profiling import profile_tables
+from smartjoin.semantics import apply_semantics_plugin
 
 
 def analyze_path(

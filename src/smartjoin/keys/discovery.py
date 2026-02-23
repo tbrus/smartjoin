@@ -6,7 +6,7 @@ import itertools
 
 import polars as pl
 
-from alchemia.models import KeyCandidate, Table, TableKeyDiscovery
+from smartjoin.models import KeyCandidate, Table, TableKeyDiscovery
 
 
 def _candidate_score(uniqueness_ratio: float, null_row_pct: float) -> float:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polars as pl
 
-from alchemia.debug_site import _jsonable, build_debug_site
+from smartjoin.debug_site import _jsonable, build_debug_site
 
 
 def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
@@ -31,8 +31,8 @@ def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
     assert data_path.exists()
 
     html = index_path.read_text(encoding="utf-8")
-    assert "alchemiaEmbeddedData" in html
-    assert "__ALCHEMIA_EMBEDDED_DATA__" not in html
+    assert "smartjoinEmbeddedData" in html
+    assert "__SMARTJOIN_EMBEDDED_DATA__" not in html
     assert "covRecall" in html
     assert "covPrecision" in html
     assert "joinsFoundList" in html

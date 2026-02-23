@@ -3,8 +3,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from alchemia.models import Table
-from alchemia.profiling import profile_table
+from smartjoin.models import Table
+from smartjoin.profiling import profile_table
 
 
 def test_profile_table_computes_expected_column_stats() -> None:

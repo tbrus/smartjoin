@@ -6,7 +6,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from alchemia.ingestion import load_tables
+from smartjoin.ingestion import load_tables
 
 
 def test_load_tables_supports_csv_parquet_and_json(tmp_path: Path) -> None:

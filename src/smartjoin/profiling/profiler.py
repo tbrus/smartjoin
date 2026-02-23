@@ -7,7 +7,7 @@ from typing import Any
 
 import polars as pl
 
-from alchemia.models import ColumnProfile, Table, TableProfile
+from smartjoin.models import ColumnProfile, Table, TableProfile
 
 DEFAULT_NEAR_UNIQUE_THRESHOLD = 0.90
 DEFAULT_ENTROPY_VALUE_CAP = 50_000

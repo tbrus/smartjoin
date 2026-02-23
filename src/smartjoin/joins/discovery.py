@@ -7,17 +7,17 @@ from difflib import SequenceMatcher
 
 import polars as pl
 
-from alchemia.config import (
+from smartjoin.config import (
     DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
     DEFAULT_NEAR_UNIQUE_THRESHOLD,
     merge_date_caps,
 )
-from alchemia.joins.signatures import (
+from smartjoin.joins.signatures import (
     ColumnSignature,
     SignatureCache,
     build_column_signatures,
 )
-from alchemia.models import JoinCandidate, JoinScoreBreakdown, Table
+from smartjoin.models import JoinCandidate, JoinScoreBreakdown, Table
 
 DEFAULT_JOIN_WEIGHTS: dict[str, float] = {
     "type_compatibility": 0.16,

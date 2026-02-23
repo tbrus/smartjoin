@@ -4,7 +4,7 @@ import sys
 from csv import DictReader
 from pathlib import Path
 
-from alchemia.analysis import analyze_path
+from smartjoin.analysis import analyze_path
 
 
 def test_generator_writes_core_relationship_and_trap_summary(tmp_path: Path) -> None:
@@ -14,7 +14,7 @@ def test_generator_writes_core_relationship_and_trap_summary(tmp_path: Path) -> 
     subprocess.run(
         [
             sys.executable,
-            "scripts/generate_alchemia_testdata.py",
+            "scripts/generate_smartjoin_testdata.py",
             "--out-dir",
             str(out_dir),
             "--seed",
@@ -90,7 +90,7 @@ def test_analyze_recovers_core_ground_truth_joins_on_dirty_generated_data(tmp_pa
     subprocess.run(
         [
             sys.executable,
-            "scripts/generate_alchemia_testdata.py",
+            "scripts/generate_smartjoin_testdata.py",
             "--out-dir",
             str(out_dir),
             "--seed",

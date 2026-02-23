@@ -6,7 +6,7 @@ from collections import defaultdict
 
 import networkx as nx
 
-from alchemia.models import JoinCandidate, JoinGraphEdge, JoinGraphNode, JoinGraphReport, Table
+from smartjoin.models import JoinCandidate, JoinGraphEdge, JoinGraphNode, JoinGraphReport, Table
 
 
 def _edge_group_id(left_table: str, right_table: str) -> str:

@@ -10,8 +10,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from alchemia.analysis import analyze_path
-from alchemia.debug_site import build_debug_site
+from smartjoin.analysis import analyze_path
+from smartjoin.debug_site import build_debug_site
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class Scenario:
     include_json: bool
     min_confidence: float
     sample_rows: int
-    generator_script: str = "scripts/generate_alchemia_testdata.py"
+    generator_script: str = "scripts/generate_smartjoin_testdata.py"
 
 
 DEFAULT_SCENARIOS: tuple[Scenario, ...] = (
@@ -103,7 +103,7 @@ DEFAULT_SCENARIOS: tuple[Scenario, ...] = (
         include_json=False,
         min_confidence=0.8,
         sample_rows=10_000,
-        generator_script="scripts/generate_alchemia_health_testdata.py",
+        generator_script="scripts/generate_smartjoin_health_testdata.py",
     ),
     Scenario(
         name="health_dirty_small",
@@ -116,7 +116,7 @@ DEFAULT_SCENARIOS: tuple[Scenario, ...] = (
         include_json=True,
         min_confidence=0.75,
         sample_rows=12_000,
-        generator_script="scripts/generate_alchemia_health_testdata.py",
+        generator_script="scripts/generate_smartjoin_health_testdata.py",
     ),
     Scenario(
         name="saas_baseline_small",
@@ -129,7 +129,7 @@ DEFAULT_SCENARIOS: tuple[Scenario, ...] = (
         include_json=False,
         min_confidence=0.8,
         sample_rows=10_000,
-        generator_script="scripts/generate_alchemia_saas_testdata.py",
+        generator_script="scripts/generate_smartjoin_saas_testdata.py",
     ),
     Scenario(
         name="saas_dirty_small",
@@ -142,7 +142,7 @@ DEFAULT_SCENARIOS: tuple[Scenario, ...] = (
         include_json=True,
         min_confidence=0.74,
         sample_rows=12_000,
-        generator_script="scripts/generate_alchemia_saas_testdata.py",
+        generator_script="scripts/generate_smartjoin_saas_testdata.py",
     ),
 )
 
@@ -298,7 +298,7 @@ def _evaluate(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate and evaluate multi-scenario Alchemia perf suite."
+        description="Generate and evaluate multi-scenario Smartjoin perf suite."
     )
     parser.add_argument(
         "--datasets-root",
@@ -317,7 +317,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skip-analysis",
         action="store_true",
-        help="Only generate datasets; do not run Alchemia analysis/evaluation.",
+        help="Only generate datasets; do not run Smartjoin analysis/evaluation.",
     )
     return parser.parse_args()
 

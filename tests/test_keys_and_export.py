@@ -2,9 +2,9 @@ from pathlib import Path
 
 import polars as pl
 
-from alchemia.exporters import build_sql_skeleton
-from alchemia.keys import discover_keys
-from alchemia.models import Table
+from smartjoin.exporters import build_sql_skeleton
+from smartjoin.keys import discover_keys
+from smartjoin.models import Table
 
 
 def test_discover_keys_finds_primary_and_composite_candidates() -> None:
