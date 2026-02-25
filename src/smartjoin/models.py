@@ -82,6 +82,7 @@ class DerivedTransform(BaseModel):
 
     transform_id: str
     params: dict[str, Any] = Field(default_factory=dict)
+    description: str | None = None
     derived_from_table: str
     derived_from_column: str
     example_mappings: list[dict[str, str]] = Field(default_factory=list, max_length=3)

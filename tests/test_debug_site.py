@@ -43,6 +43,7 @@ def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
     assert "Unexpected Joins" in html
     assert "edge-unknown" in html
     assert "attachDrag" in html
+    assert "derived?.description" in html
     assert "Core Relationships" not in html
 
     payload = json.loads(data_path.read_text(encoding="utf-8"))

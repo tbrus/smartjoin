@@ -1043,6 +1043,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       };
       const label = labelMap[truthState] || labelMap.unknown;
       const derived = rel.derived || null;
+      const derivedDescription = String(derived?.description || "").trim();
       const derivedExamples = (derived?.example_mappings || [])
         .slice(0, 3)
         .map((item) => {
@@ -1067,8 +1068,10 @@ DEBUG_SITE_HTML = """<!doctype html>
         ? `
           <div style="margin-top:6px; padding:6px 8px; border:1px dashed var(--border); border-radius:8px; background:rgba(255,255,255,0.68);">
             <div style="font-weight:600; font-size:0.76rem; margin-bottom:3px;">Derived column</div>
-            <div style="font-size:0.75rem;">transform: ${String(derived.transform_id || "")}</div>
-            <div style="font-size:0.75rem;">params: ${JSON.stringify(derived.params || {})}</div>
+            <div style="font-size:0.75rem;">${
+              derivedDescription ||
+              `Transform ${String(derived.transform_id || "")} ${JSON.stringify(derived.params || {})}`
+            }</div>
             ${derivedExamples ? `<div style="margin-top:4px; font-size:0.74rem;">${derivedExamples}</div>` : ""}
           </div>
         `
@@ -1077,8 +1080,6 @@ DEBUG_SITE_HTML = """<!doctype html>
         ? `
           <div style="margin-top:6px; padding:6px 8px; border:1px dashed var(--border); border-radius:8px; background:rgba(255,255,255,0.68);">
             <div style="font-weight:600; font-size:0.76rem; margin-bottom:3px;">Original column</div>
-            <div style="font-size:0.75rem;">transform: identity</div>
-            <div style="font-size:0.75rem;">params: {}</div>
             ${
               originalExamples
                 ? `<div style="margin-top:4px; font-size:0.74rem;">${originalExamples}</div>`
@@ -1759,5 +1760,3 @@ def build_debug_site(
     index_path.write_text(rendered_html, encoding="utf-8")
     data_path.write_text(payload_json, encoding="utf-8")
     return index_path, data_path
-
-

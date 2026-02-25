@@ -24,6 +24,7 @@ from smartjoin.joins.derived import (
     entity_cores_compatible,
     normalize_transformed_value_for_signature,
     rank_derived_source_columns,
+    transform_description,
 )
 from smartjoin.joins.signatures import (
     ColumnSignature,
@@ -1331,6 +1332,10 @@ def find_join_candidates(
                         derived_meta = DerivedTransform(
                             transform_id=variant.transform_id,
                             params=dict(variant.params),
+                            description=transform_description(
+                                transform_id=variant.transform_id,
+                                params=variant.params,
+                            ),
                             derived_from_table=left_sig.table_name,
                             derived_from_column=left_sig.column_name,
                             example_mappings=variant.example_mappings[:3],
@@ -1398,6 +1403,10 @@ def find_join_candidates(
                         derived_meta = DerivedTransform(
                             transform_id=variant.transform_id,
                             params=dict(variant.params),
+                            description=transform_description(
+                                transform_id=variant.transform_id,
+                                params=variant.params,
+                            ),
                             derived_from_table=right_sig.table_name,
                             derived_from_column=right_sig.column_name,
                             example_mappings=variant.example_mappings[:3],

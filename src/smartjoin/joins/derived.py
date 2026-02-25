@@ -173,6 +173,42 @@ def _transform_strip_hyphens_underscores(value: str, _params: dict[str, Any]) ->
     return transformed or None
 
 
+def transform_description(transform_id: str, params: dict[str, Any]) -> str:
+    """Return a deterministic human-readable description for a transform."""
+    normalized_id = str(transform_id or "").strip().lower()
+    raw_params = params if isinstance(params, dict) else {}
+
+    if normalized_id == "strip_non_alnum":
+        return "Strip non-alphanumeric characters"
+    if normalized_id == "lowercase":
+        return "Convert to lowercase"
+    if normalized_id == "strip_hyphens_underscores":
+        return "Remove hyphens and underscores"
+    if normalized_id == "remove_prefix":
+        prefix = str(raw_params.get("prefix", "")).strip()
+        if prefix:
+            return f"Remove prefix '{prefix}'"
+        return "Remove detected prefix"
+    if normalized_id == "replace_prefix":
+        from_prefix = str(raw_params.get("from", "")).strip()
+        to_prefix = str(raw_params.get("to", "")).strip()
+        if from_prefix or to_prefix:
+            return f"Replace prefix '{from_prefix}' -> '{to_prefix}'"
+        return "Replace detected prefix"
+
+    label = normalized_id.replace("_", " ").strip()
+    if label:
+        label = label[0].upper() + label[1:]
+    else:
+        label = "Unknown transform"
+    if raw_params:
+        params_text = ", ".join(
+            f"{key}={raw_params[key]!r}" for key in sorted(raw_params.keys(), key=str)
+        )
+        return f"{label} ({params_text})"
+    return label
+
+
 def _extract_prefix_token(value: str) -> str | None:
     match = re.match(r"^\s*([A-Za-z]{2,})", value)
     if not match:
