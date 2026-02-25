@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from difflib import SequenceMatcher
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 
 import polars as pl
@@ -49,8 +49,6 @@ class DerivedCandidate:
     transform_id: str
     params: dict[str, Any]
     transformed_values_sample_set: frozenset[str]
-    derived_values_sample_set: frozenset[object]
-    derived_distinct_count_sample: int
     example_mappings: list[dict[str, str]]
 
 
@@ -366,8 +364,6 @@ def derive_candidates_for_column(
                 transform_id=spec.id,
                 params=dict(spec.params),
                 transformed_values_sample_set=transformed_set,
-                derived_values_sample_set=derived_set,
-                derived_distinct_count_sample=len(derived_set),
                 example_mappings=examples[:3],
             )
         )
