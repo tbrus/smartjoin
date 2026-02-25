@@ -379,3 +379,86 @@ def test_direct_join_outranks_similar_derived_join() -> None:
     assert direct_join.breakdown.signals["inclusion_fk_in_pk"] >= 0.99
     assert derived_join.breakdown.signals["inclusion_fk_in_pk"] >= 0.99
     assert direct_join.confidence > derived_join.confidence
+
+
+def test_derived_ambiguity_ignores_non_key_competing_columns() -> None:
+    events = Table(
+        name="events",
+        path=Path("events.csv"),
+        df=pl.DataFrame(
+            {
+                "product_key": [f"prod-{((i - 1) % 3) + 1:05d}" for i in range(1, 91)],
+            }
+        ),
+    )
+    product_dim = Table(
+        name="product_dim",
+        path=Path("product_dim.csv"),
+        df=pl.DataFrame(
+            {
+                "product_id": [f"prd{((i - 1) % 3) + 1:05d}" for i in range(1, 31)],
+                "status_text_a": [
+                    f"prd{((i - 1) % 2) + 1:05d}" for i in range(1, 31)
+                ],
+                "status_text_b": [
+                    f"prd{((i + 0) % 2) + 1:05d}" for i in range(1, 31)
+                ],
+            }
+        ),
+    )
+
+    candidates = find_join_candidates(
+        tables=[events, product_dim],
+        sample_rows=1_000,
+        min_confidence=0.75,
+        derived_min_distinct=2,
+    )
+
+    product_join = next(
+        c
+        for c in candidates
+        if c.left_table == "events"
+        and c.left_column == "product_key"
+        and c.right_table == "product_dim"
+        and c.right_column == "product_id"
+    )
+    assert product_join.derived is not None
+
+
+def test_derived_ambiguity_rejects_multiple_plausible_key_competitors() -> None:
+    events = Table(
+        name="events",
+        path=Path("events.csv"),
+        df=pl.DataFrame(
+            {
+                "product_key": [f"prod-{((i - 1) % 3) + 1:05d}" for i in range(1, 91)],
+            }
+        ),
+    )
+    product_dim = Table(
+        name="product_dim",
+        path=Path("product_dim.csv"),
+        df=pl.DataFrame(
+            {
+                "product_id": [f"prd{((i - 1) % 3) + 1:05d}" for i in range(1, 31)],
+                "product_alt_id": [f"prd{((i - 1) % 3) + 1:05d}" for i in range(1, 31)],
+                "product_legacy_id": [f"prd{((i - 1) % 3) + 1:05d}" for i in range(1, 31)],
+            }
+        ),
+    )
+
+    candidates = find_join_candidates(
+        tables=[events, product_dim],
+        sample_rows=1_000,
+        min_confidence=0.75,
+        derived_min_distinct=2,
+    )
+
+    blocked_edges = [
+        c
+        for c in candidates
+        if c.left_table == "events"
+        and c.left_column == "product_key"
+        and c.right_table == "product_dim"
+    ]
+    assert blocked_edges == []

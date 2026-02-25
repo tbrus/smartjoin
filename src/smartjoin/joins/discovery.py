@@ -706,12 +706,30 @@ def _get_or_build_derived_variants(
     return variants
 
 
+def _is_plausible_key_col(sig: ColumnSignature, min_distinct: int) -> bool:
+    if sig.name_features.date_like:
+        return False
+    if sig.name_features.identifier_like or sig.name_features.code_like:
+        return True
+    if sig.row_count <= 0:
+        return False
+    if sig.distinct_count < max(1, int(min_distinct)):
+        return False
+    if sig.uniqueness_ratio < 0.2:
+        return False
+    distinct_ratio = sig.distinct_count / sig.row_count
+    if distinct_ratio < 0.05:
+        return False
+    return True
+
+
 def _derived_is_ambiguous(
     transformed_fk_values: frozenset[str],
     target_table: Table,
     target_column: str,
     signatures: SignatureCache,
     max_ambiguous_targets: int,
+    min_distinct: int,
 ) -> bool:
     threshold = 0.6
     ambiguous = 0
@@ -719,6 +737,8 @@ def _derived_is_ambiguous(
         if candidate_column == target_column:
             continue
         candidate_sig = signatures[(target_table.name, candidate_column)]
+        if not _is_plausible_key_col(candidate_sig, min_distinct=min_distinct):
+            continue
         if not candidate_sig.sampled_unique_set:
             continue
         fk_values = _normalize_transformed_values_for_target(
@@ -1322,6 +1342,7 @@ def find_join_candidates(
                             target_column=right_sig.column_name,
                             signatures=signatures,
                             max_ambiguous_targets=max(0, int(derived_max_ambiguous_targets)),
+                            min_distinct=derived_budgets.min_distinct,
                         ):
                             continue
                         inclusion_fk_in_pk = _estimated_inclusion_from_sets(
@@ -1394,6 +1415,7 @@ def find_join_candidates(
                             target_column=left_sig.column_name,
                             signatures=signatures,
                             max_ambiguous_targets=max(0, int(derived_max_ambiguous_targets)),
+                            min_distinct=derived_budgets.min_distinct,
                         ):
                             continue
                         inclusion_fk_in_pk = _estimated_inclusion_from_sets(
