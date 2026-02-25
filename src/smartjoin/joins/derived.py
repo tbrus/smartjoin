@@ -25,6 +25,8 @@ _QUALIFIER_TOKENS = {
     "primary",
     "secondary",
 }
+_VALUE_PREFIX_MIN_SUPPORT = 0.6
+_VALUE_PREFIX_MIN_SAMPLES = 20
 
 
 @dataclass(frozen=True)
@@ -214,6 +216,47 @@ def _extract_prefix_token(value: str) -> str | None:
     if not match:
         return None
     return match.group(1).lower()
+
+
+def detect_dominant_value_prefix(
+    values: list[str],
+    min_support: float = _VALUE_PREFIX_MIN_SUPPORT,
+    min_samples: int = _VALUE_PREFIX_MIN_SAMPLES,
+) -> str | None:
+    """
+    Detect a dominant leading alpha prefix from sampled identifier-like values.
+
+    Returns lowercased prefix token when:
+    - at least `min_samples` values expose a leading alpha token
+    - most common token support is at least `min_support`
+    """
+    if min_samples <= 0:
+        min_samples = 1
+    if min_support <= 0:
+        min_support = 0.0
+
+    prefixes: list[str] = []
+    for raw in values:
+        text = _to_text(raw)
+        if text is None:
+            continue
+        match = re.match(r"^[A-Za-z]+", text)
+        if not match:
+            continue
+        token = match.group(0).lower()
+        if token:
+            prefixes.append(token)
+
+    if len(prefixes) < min_samples:
+        return None
+    counts: dict[str, int] = {}
+    for token in prefixes:
+        counts[token] = counts.get(token, 0) + 1
+    dominant, count = max(counts.items(), key=lambda item: (item[1], item[0]))
+    support = count / max(len(prefixes), 1)
+    if support < min_support:
+        return None
+    return dominant
 
 
 def _detect_dominant_prefix(

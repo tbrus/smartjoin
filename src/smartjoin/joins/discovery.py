@@ -21,6 +21,7 @@ from smartjoin.config import (
 from smartjoin.joins.derived import (
     DerivedBudgets,
     DerivedCandidate,
+    detect_dominant_value_prefix,
     derive_candidates_for_column,
     entity_cores_compatible,
     normalize_transformed_value_for_signature,
@@ -658,6 +659,33 @@ def _normalize_transformed_values_for_target(
     return frozenset(normalized)
 
 
+def _dominant_prefix_from_values(values: frozenset[object]) -> str | None:
+    text_values: list[str] = []
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            text_values.append(text)
+    if not text_values:
+        return None
+    return detect_dominant_value_prefix(text_values)
+
+
+def _value_prefix_similarity(left_prefix: str, right_prefix: str) -> float:
+    left = left_prefix.strip().lower()
+    right = right_prefix.strip().lower()
+    if not left or not right:
+        return 0.0
+    if left == right:
+        return 1.0
+    if left.startswith(right) or right.startswith(left):
+        return 0.85
+    if left in right or right in left:
+        return 0.75
+    return float(SequenceMatcher(None, left, right).ratio())
+
+
 def _derived_fallback_rank_limit(max_columns_per_table: int) -> int:
     base = max(1, int(max_columns_per_table))
     return base + max(2, base)
@@ -1209,6 +1237,7 @@ def find_join_candidates(
     derived_cache: dict[tuple[str, str], list[DerivedCandidate]] = {}
     derived_attempted: set[tuple[str, str]] = set()
     derived_rank_index: dict[tuple[str, str], int] = {}
+    target_prefix_cache: dict[tuple[str, str], str | None] = {}
     if derived_joins_enabled:
         max_columns_per_table = max(0, int(derived_budgets.max_columns_per_table))
         for table in tables:
@@ -1330,6 +1359,21 @@ def find_join_candidates(
                     for variant in left_variants:
                         if not _is_preferred_fk_direction(fk=left_sig, pk=right_sig):
                             continue
+                        src_prefix = _dominant_prefix_from_values(
+                            frozenset(variant.transformed_values_sample_set)
+                        )
+                        target_key = (right_sig.table_name, right_sig.column_name)
+                        if target_key not in target_prefix_cache:
+                            target_prefix_cache[target_key] = _dominant_prefix_from_values(
+                                right_sig.sampled_unique_set
+                            )
+                        tgt_prefix = target_prefix_cache[target_key]
+                        if (
+                            src_prefix
+                            and tgt_prefix
+                            and _value_prefix_similarity(src_prefix, tgt_prefix) < 0.6
+                        ):
+                            continue
                         fk_values = _normalize_transformed_values_for_target(
                             transformed_values=variant.transformed_values_sample_set,
                             target_sig=right_sig,
@@ -1402,6 +1446,21 @@ def find_join_candidates(
                     )
                     for variant in right_variants:
                         if not _is_preferred_fk_direction(fk=right_sig, pk=left_sig):
+                            continue
+                        src_prefix = _dominant_prefix_from_values(
+                            frozenset(variant.transformed_values_sample_set)
+                        )
+                        target_key = (left_sig.table_name, left_sig.column_name)
+                        if target_key not in target_prefix_cache:
+                            target_prefix_cache[target_key] = _dominant_prefix_from_values(
+                                left_sig.sampled_unique_set
+                            )
+                        tgt_prefix = target_prefix_cache[target_key]
+                        if (
+                            src_prefix
+                            and tgt_prefix
+                            and _value_prefix_similarity(src_prefix, tgt_prefix) < 0.6
+                        ):
                             continue
                         fk_values = _normalize_transformed_values_for_target(
                             transformed_values=variant.transformed_values_sample_set,

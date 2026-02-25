@@ -462,3 +462,56 @@ def test_derived_ambiguity_rejects_multiple_plausible_key_competitors() -> None:
         and c.right_table == "product_dim"
     ]
     assert blocked_edges == []
+
+
+def test_generic_id_columns_use_value_prefix_guard_for_derived_joins() -> None:
+    left = Table(
+        name="events",
+        path=Path("events.csv"),
+        df=pl.DataFrame(
+            {
+                "id": [f"prod-{i:05d}" for i in range(1, 41)],
+            }
+        ),
+    )
+    product_dim = Table(
+        name="product_dim",
+        path=Path("product_dim.csv"),
+        df=pl.DataFrame(
+            {
+                "id": [f"prd{i:05d}" for i in range(1, 41)],
+            }
+        ),
+    )
+    customer_dim = Table(
+        name="customer_dim",
+        path=Path("customer_dim.csv"),
+        df=pl.DataFrame(
+            {
+                "id": [f"cust{i:05d}" for i in range(1, 41)],
+            }
+        ),
+    )
+
+    candidates = find_join_candidates(
+        tables=[left, product_dim, customer_dim],
+        sample_rows=1_000,
+        min_confidence=0.75,
+        derived_min_distinct=20,
+    )
+
+    good_join = next(
+        c
+        for c in candidates
+        if {f"{c.left_table}.{c.left_column}", f"{c.right_table}.{c.right_column}"}
+        == {"events.id", "product_dim.id"}
+    )
+    assert good_join.derived is not None
+
+    blocked_edges = [
+        c
+        for c in candidates
+        if {f"{c.left_table}.{c.left_column}", f"{c.right_table}.{c.right_column}"}
+        == {"events.id", "customer_dim.id"}
+    ]
+    assert blocked_edges == []
