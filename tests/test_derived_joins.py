@@ -276,3 +276,50 @@ def test_date_key_to_date_id_join_is_preserved() -> None:
         and c.right_column == "date_id"
     ]
     assert key_joins
+
+
+def test_noncanonical_alias_edge_is_suppressed_when_canonical_exists() -> None:
+    accounts = Table(
+        name="accounts",
+        path=Path("accounts.csv"),
+        df=pl.DataFrame(
+            {
+                "account_id": [f"ACC{i:06d}" for i in range(1, 121)],
+                "acct_id": [
+                    f"ACC{i:06d}" if i % 7 else f"ACT{i:06d}"
+                    for i in range(1, 121)
+                ],
+            }
+        ),
+    )
+    workspaces = Table(
+        name="workspaces",
+        path=Path("workspaces.csv"),
+        df=pl.DataFrame(
+            {
+                "account_key_id": [f"ACC{((i - 1) % 120) + 1:06d}" for i in range(1, 481)],
+            }
+        ),
+    )
+
+    candidates = find_join_candidates(
+        tables=[accounts, workspaces],
+        sample_rows=1000,
+        min_confidence=0.72,
+        derived_min_distinct=20,
+    )
+    edge_strings = {
+        f"{c.left_table}.{c.left_column}<->{c.right_table}.{c.right_column}" for c in candidates
+    }
+    canonical_present = any(
+        {f"{c.left_table}.{c.left_column}", f"{c.right_table}.{c.right_column}"}
+        == {"workspaces.account_key_id", "accounts.account_id"}
+        for c in candidates
+    )
+    alias_present = any(
+        {f"{c.left_table}.{c.left_column}", f"{c.right_table}.{c.right_column}"}
+        == {"workspaces.account_key_id", "accounts.acct_id"}
+        for c in candidates
+    )
+    assert canonical_present, edge_strings
+    assert not alias_present, edge_strings

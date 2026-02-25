@@ -281,17 +281,47 @@ def _build_table_identifier_winners(
     This suppresses alternate ID abbreviations when a clearer
     canonical key exists in the same table.
     """
-    groups: dict[tuple[str, str], list[ColumnSignature]] = {}
+    def _entity_core_compatible_text(left_core: str, right_core: str) -> bool:
+        left = left_core.strip().lower()
+        right = right_core.strip().lower()
+        if not left or not right:
+            return False
+        if left == right:
+            return True
+        if left.startswith(right) or right.startswith(left):
+            return True
+        if min(len(left), len(right)) >= 3:
+            return SequenceMatcher(None, left, right).ratio() >= 0.72
+        return False
+
+    by_table: dict[str, list[ColumnSignature]] = {}
     for sig in signatures.values():
         if not _is_identifier(sig):
             continue
-        entity_core = sig.name_features.entity_core
-        if not entity_core:
+        if not sig.name_features.entity_core:
             continue
-        groups.setdefault((sig.table_name, entity_core), []).append(sig)
+        by_table.setdefault(sig.table_name, []).append(sig)
 
     winners: dict[tuple[str, str], tuple[str, str]] = {}
-    for key, cols in groups.items():
+    for table_name, table_cols in by_table.items():
+        core_groups: list[list[ColumnSignature]] = []
+        for sig in table_cols:
+            matched_group: list[ColumnSignature] | None = None
+            for group in core_groups:
+                if any(
+                    _entity_core_compatible_text(
+                        sig.name_features.entity_core,
+                        member.name_features.entity_core,
+                    )
+                    for member in group
+                ):
+                    matched_group = group
+                    break
+            if matched_group is None:
+                core_groups.append([sig])
+            else:
+                matched_group.append(sig)
+
         def _quality(sig: ColumnSignature) -> tuple[int, int, int, int, int]:
             tokens = set(sig.name_features.tokens)
             has_alt = int(any(token in {"alt", "legacy", "old"} for token in tokens))
@@ -304,17 +334,21 @@ def _build_table_identifier_winners(
                 int("key" in tokens),
             )
 
-        winner = sorted(
-            cols,
-            key=lambda sig: (
-                *_quality(sig),
-                sig.uniqueness_ratio,
-                sig.distinct_count,
-                -len(sig.column_name),
-            ),
-            reverse=True,
-        )[0]
-        winners[key] = (winner.table_name, winner.column_name)
+        for group in core_groups:
+            winner = sorted(
+                group,
+                key=lambda sig: (
+                    *_quality(sig),
+                    len(sig.name_features.entity_core),
+                    sig.uniqueness_ratio,
+                    sig.distinct_count,
+                    len(sig.column_name),
+                ),
+                reverse=True,
+            )[0]
+            winner_key = (winner.table_name, winner.column_name)
+            for member in group:
+                winners[(table_name, member.name_features.entity_core)] = winner_key
     return winners
 
 
@@ -821,6 +855,153 @@ def _dedupe_temporal_equivalent_targets(
     return deduped
 
 
+def _dedupe_bidirectional_endpoint_pairs(
+    candidates: list[JoinCandidate],
+) -> list[JoinCandidate]:
+    """
+    Keep one best candidate per undirected endpoint pair.
+
+    Prevents duplicate edges for the same two columns in opposite directions.
+    """
+    best_by_pair: dict[tuple[str, str], JoinCandidate] = {}
+    for candidate in candidates:
+        pair_key = tuple(
+            sorted(
+                [
+                    f"{candidate.left_table}.{candidate.left_column}".lower(),
+                    f"{candidate.right_table}.{candidate.right_column}".lower(),
+                ]
+            )
+        )
+        current = best_by_pair.get(pair_key)
+        if current is None or _should_replace_candidate(current=current, incoming=candidate):
+            best_by_pair[pair_key] = candidate
+    return list(best_by_pair.values())
+
+
+def _drop_dominated_noncanonical_targets(
+    candidates: list[JoinCandidate],
+    signatures: SignatureCache,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+) -> list[JoinCandidate]:
+    """
+    Drop non-canonical identifier targets when a stronger canonical sibling exists.
+
+    This suppresses alias/trap columns (e.g. `cust_id`) when the canonical column
+    in the same table (e.g. `customer_id`) already explains the same source FK.
+    """
+    by_group: dict[tuple[str, str, str], list[JoinCandidate]] = {}
+    passthrough: list[JoinCandidate] = []
+    for candidate in candidates:
+        pk_sig = signatures[(candidate.right_table, candidate.right_column)]
+        if not _is_identifier(pk_sig):
+            passthrough.append(candidate)
+            continue
+        group_key = (candidate.left_table, candidate.left_column, candidate.right_table)
+        by_group.setdefault(group_key, []).append(candidate)
+
+    kept: list[JoinCandidate] = []
+    dominance_margin = 0.03
+    for group_candidates in by_group.values():
+        by_right_col = {candidate.right_column: candidate for candidate in group_candidates}
+        for candidate in group_candidates:
+            pk_sig = signatures[(candidate.right_table, candidate.right_column)]
+            winner = table_identifier_winners.get((pk_sig.table_name, pk_sig.name_features.entity_core))
+            if winner is None:
+                kept.append(candidate)
+                continue
+            winner_table, winner_col = winner
+            if winner_table != candidate.right_table or winner_col == candidate.right_column:
+                kept.append(candidate)
+                continue
+            canonical_candidate = by_right_col.get(winner_col)
+            if canonical_candidate is None:
+                kept.append(candidate)
+                continue
+            if canonical_candidate.confidence >= (candidate.confidence + dominance_margin):
+                continue
+            kept.append(candidate)
+
+    kept.extend(passthrough)
+    return kept
+
+
+def _drop_noncanonical_alias_edges(
+    candidates: list[JoinCandidate],
+    signatures: SignatureCache,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+) -> list[JoinCandidate]:
+    """
+    Suppress alias edges when a stronger canonical sibling edge exists.
+
+    This is orientation-agnostic and compares edges by undirected endpoint pair,
+    so `A.alias -> B.key` is dropped when `A.canonical <-> B.key` is stronger.
+    """
+    dominance_margin = 0.03
+    candidate_by_pair: dict[tuple[str, str], JoinCandidate] = {}
+
+    def _endpoint(table: str, column: str) -> str:
+        return f"{table}.{column}".lower()
+
+    for candidate in candidates:
+        pair_key = tuple(
+            sorted(
+                [
+                    _endpoint(candidate.left_table, candidate.left_column),
+                    _endpoint(candidate.right_table, candidate.right_column),
+                ]
+            )
+        )
+        candidate_by_pair[pair_key] = candidate
+
+    kept: list[JoinCandidate] = []
+    for candidate in candidates:
+        drop = False
+        left_sig = signatures[(candidate.left_table, candidate.left_column)]
+        right_sig = signatures[(candidate.right_table, candidate.right_column)]
+        side_specs = (
+            (
+                candidate.left_table,
+                candidate.left_column,
+                left_sig,
+                _endpoint(candidate.right_table, candidate.right_column),
+            ),
+            (
+                candidate.right_table,
+                candidate.right_column,
+                right_sig,
+                _endpoint(candidate.left_table, candidate.left_column),
+            ),
+        )
+        for table_name, column_name, sig, opposite_endpoint in side_specs:
+            if not _is_identifier(sig):
+                continue
+            entity_core = sig.name_features.entity_core
+            if not entity_core:
+                continue
+            winner = table_identifier_winners.get((table_name, entity_core))
+            if winner is None:
+                continue
+            winner_table, winner_column = winner
+            if winner_table != table_name:
+                continue
+            if winner_column == column_name:
+                continue
+            canonical_pair_key = tuple(
+                sorted([_endpoint(winner_table, winner_column), opposite_endpoint])
+            )
+            canonical_candidate = candidate_by_pair.get(canonical_pair_key)
+            if canonical_candidate is None:
+                continue
+            if canonical_candidate.confidence >= (candidate.confidence + dominance_margin):
+                drop = True
+                break
+        if drop:
+            continue
+        kept.append(candidate)
+    return kept
+
+
 def _score_candidate(
     *,
     fk_sig: ColumnSignature,
@@ -1256,6 +1437,17 @@ def find_join_candidates(
     final_candidates = _dedupe_temporal_equivalent_targets(
         candidates=list(best_candidates.values()),
         signatures=signatures,
+    )
+    final_candidates = _dedupe_bidirectional_endpoint_pairs(final_candidates)
+    final_candidates = _drop_dominated_noncanonical_targets(
+        candidates=final_candidates,
+        signatures=signatures,
+        table_identifier_winners=table_identifier_winners,
+    )
+    final_candidates = _drop_noncanonical_alias_edges(
+        candidates=final_candidates,
+        signatures=signatures,
+        table_identifier_winners=table_identifier_winners,
     )
     return sorted(
         final_candidates,
