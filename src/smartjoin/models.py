@@ -77,6 +77,17 @@ class JoinScoreBreakdown(BaseModel):
     weighted_score: float = Field(ge=0.0, le=1.0)
 
 
+class DerivedTransform(BaseModel):
+    """Metadata describing a deterministic derived-key transform."""
+
+    transform_id: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    derived_from_table: str
+    derived_from_column: str
+    example_mappings: list[dict[str, str]] = Field(default_factory=list, max_length=3)
+    notes: str | None = None
+
+
 class JoinCandidate(BaseModel):
     """Join edge candidate between two columns."""
 
@@ -87,6 +98,7 @@ class JoinCandidate(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     relationship_guess: str
     breakdown: JoinScoreBreakdown
+    derived: DerivedTransform | None = None
 
 
 class JoinGraphNode(BaseModel):
@@ -107,6 +119,7 @@ class JoinGraphEdge(BaseModel):
     edge_rank: int = Field(ge=1)
     confidence: float = Field(ge=0.0, le=1.0)
     relationship_guess: str
+    derived: DerivedTransform | None = None
 
 
 class JoinGraphReport(BaseModel):
@@ -128,6 +141,11 @@ class AnalysisSettingsReport(BaseModel):
     distinct_low_card_threshold: int = Field(ge=1)
     near_unique_threshold: float = Field(ge=0.0, le=1.0)
     date_caps: dict[str, float]
+    derived_joins_enabled: bool = True
+    derived_max_transforms_per_column: int = Field(ge=1)
+    derived_max_columns_per_table: int = Field(ge=1)
+    derived_min_distinct: int = Field(ge=1)
+    derived_max_ambiguous_targets: int = Field(ge=0)
 
 
 class AnalysisReport(BaseModel):

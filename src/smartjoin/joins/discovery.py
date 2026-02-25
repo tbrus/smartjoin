@@ -10,14 +10,27 @@ import polars as pl
 from smartjoin.config import (
     DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
     DEFAULT_NEAR_UNIQUE_THRESHOLD,
+    DERIVED_JOINS_ENABLED,
+    DERIVED_MAX_AMBIGUOUS_TARGETS,
+    DERIVED_MAX_COLUMNS_PER_TABLE,
+    DERIVED_MAX_TRANSFORMS_PER_COLUMN,
+    DERIVED_MIN_DISTINCT,
     merge_date_caps,
+)
+from smartjoin.joins.derived import (
+    DerivedBudgets,
+    DerivedCandidate,
+    derive_candidates_for_column,
+    entity_cores_compatible,
+    normalize_transformed_value_for_signature,
+    rank_derived_source_columns,
 )
 from smartjoin.joins.signatures import (
     ColumnSignature,
     SignatureCache,
     build_column_signatures,
 )
-from smartjoin.models import JoinCandidate, JoinScoreBreakdown, Table
+from smartjoin.models import DerivedTransform, JoinCandidate, JoinScoreBreakdown, Table
 
 DEFAULT_JOIN_WEIGHTS: dict[str, float] = {
     "type_compatibility": 0.16,
@@ -28,11 +41,33 @@ DEFAULT_JOIN_WEIGHTS: dict[str, float] = {
     "cardinality_alignment": 0.10,
     "date_dimension_signal": 0.05,
     "spurious_guard": 0.07,
+    "derived_penalty": 0.01,
 }
+
+
+def _contains_short_abbreviation(tokens: set[str]) -> bool:
+    qualifiers = {
+        "id",
+        "key",
+        "ref",
+        "code",
+        "uuid",
+        "alt",
+        "legacy",
+        "old",
+        "new",
+        "primary",
+        "secondary",
+    }
+    return any(token not in qualifiers and len(token) <= 3 for token in tokens)
 
 
 def _is_identifier(sig: ColumnSignature) -> bool:
     return sig.name_features.identifier_like
+
+
+def _is_keylike(sig: ColumnSignature) -> bool:
+    return sig.name_features.identifier_like or sig.name_features.code_like
 
 
 def _normalize_weights(overrides: dict[str, float] | None = None) -> dict[str, float]:
@@ -70,21 +105,33 @@ def _name_similarity(left: ColumnSignature, right: ColumnSignature) -> float:
 
 
 def _estimated_inclusion(left: ColumnSignature, right: ColumnSignature) -> float:
-    """Estimate containment `left ⊆ right` using sampled distinct sets."""
-    if not left.sampled_unique_set or not right.sampled_unique_set:
+    """Estimate containment using sampled distinct sets."""
+    return _estimated_inclusion_from_sets(
+        left_set=left.sampled_unique_set,
+        right_set=right.sampled_unique_set,
+        right_distinct_count=right.distinct_count,
+    )
+
+
+def _estimated_inclusion_from_sets(
+    left_set: frozenset[object],
+    right_set: frozenset[object],
+    right_distinct_count: int,
+) -> float:
+    if not left_set or not right_set:
         return 0.0
 
-    intersection = len(left.sampled_unique_set & right.sampled_unique_set)
+    intersection = len(left_set & right_set)
     if intersection == 0:
         return 0.0
 
-    left_sample_size = left.sampled_distinct_count
-    right_sample_size = right.sampled_distinct_count
+    left_sample_size = len(left_set)
+    right_sample_size = len(right_set)
     if left_sample_size == 0 or right_sample_size == 0:
         return 0.0
 
     raw = intersection / left_sample_size
-    right_coverage = min(1.0, right_sample_size / max(right.distinct_count, 1))
+    right_coverage = min(1.0, right_sample_size / max(right_distinct_count, 1))
     if right_coverage <= 0:
         return raw
 
@@ -144,7 +191,7 @@ def _build_identifier_hubs(signatures: SignatureCache) -> dict[str, tuple[str, s
         def _quality(sig: ColumnSignature) -> tuple[int, int, int, int, int]:
             tokens = set(sig.name_features.tokens)
             has_alt = int(any(token in {"alt", "legacy", "old"} for token in tokens))
-            has_abbrev = int(any(token in {"acct", "cust"} for token in tokens))
+            has_abbrev = int(_contains_short_abbreviation(tokens))
             return (
                 1 - has_alt,
                 1 - has_abbrev,
@@ -231,7 +278,7 @@ def _build_table_identifier_winners(
     """
     Pick one canonical identifier column per `(table, entity_core)` group.
 
-    This suppresses alternate IDs such as `acct_id`/`cust_id` when a clearer
+    This suppresses alternate ID abbreviations when a clearer
     canonical key exists in the same table.
     """
     groups: dict[tuple[str, str], list[ColumnSignature]] = {}
@@ -248,7 +295,7 @@ def _build_table_identifier_winners(
         def _quality(sig: ColumnSignature) -> tuple[int, int, int, int, int]:
             tokens = set(sig.name_features.tokens)
             has_alt = int(any(token in {"alt", "legacy", "old"} for token in tokens))
-            has_abbrev = int(any(token in {"acct", "cust"} for token in tokens))
+            has_abbrev = int(_contains_short_abbreviation(tokens))
             return (
                 1 - has_alt,
                 1 - has_abbrev,
@@ -288,7 +335,7 @@ def _canonical_identifier_penalty(
         return 1.0
     if any(token in {"alt", "legacy", "old"} for token in sig.name_features.tokens):
         return 0.2
-    if any(token in {"acct", "cust"} for token in sig.name_features.tokens):
+    if _contains_short_abbreviation(set(sig.name_features.tokens)):
         return 0.4
     return 0.6
 
@@ -513,6 +560,16 @@ def _normalize_direction(
     return right, left, inclusion_rl, inclusion_lr
 
 
+def _is_preferred_fk_direction(fk: ColumnSignature, pk: ColumnSignature) -> bool:
+    if fk.uniqueness_ratio < pk.uniqueness_ratio:
+        return True
+    if pk.uniqueness_ratio < fk.uniqueness_ratio:
+        return False
+    fk_key = (fk.table_name.lower(), fk.column_name.lower())
+    pk_key = (pk.table_name.lower(), pk.column_name.lower())
+    return fk_key <= pk_key
+
+
 def _relationship_guess(
     fk: ColumnSignature,
     pk: ColumnSignature,
@@ -537,6 +594,372 @@ def _relationship_guess(
     return "many_to_many"
 
 
+def _derived_pair_prefilter(
+    left_sig: ColumnSignature,
+    right_sig: ColumnSignature,
+    name_similarity: float,
+) -> bool:
+    if left_sig.name_features.date_like or right_sig.name_features.date_like:
+        return False
+    if left_sig.dtype.is_temporal() or right_sig.dtype.is_temporal():
+        return False
+    left_key = _is_keylike(left_sig)
+    right_key = _is_keylike(right_sig)
+    if not ((left_key and right_key) or ((left_key or right_key) and name_similarity >= 0.8)):
+        return False
+    return entity_cores_compatible(left_sig, right_sig)
+
+
+def _normalize_transformed_values_for_target(
+    transformed_values: frozenset[str],
+    target_sig: ColumnSignature,
+) -> frozenset[object]:
+    if not transformed_values:
+        return frozenset()
+    normalized = {
+        normalize_transformed_value_for_signature(value, signature=target_sig)
+        for value in transformed_values
+    }
+    return frozenset(normalized)
+
+
+def _derived_fallback_rank_limit(max_columns_per_table: int) -> int:
+    base = max(1, int(max_columns_per_table))
+    return base + max(2, base)
+
+
+def _get_or_build_derived_variants(
+    *,
+    source_sig: ColumnSignature,
+    target_sig: ColumnSignature,
+    source_table: Table,
+    sample_rows: int,
+    sample_seed: int,
+    budgets: DerivedBudgets,
+    derived_cache: dict[tuple[str, str], list[DerivedCandidate]],
+    derived_attempted: set[tuple[str, str]],
+    derived_rank_index: dict[tuple[str, str], int],
+    name_similarity: float,
+) -> list[DerivedCandidate]:
+    source_key = (source_sig.table_name, source_sig.column_name)
+    cached = derived_cache.get(source_key)
+    if cached is not None:
+        return cached
+    if source_key in derived_attempted:
+        return []
+    rank = derived_rank_index.get(source_key)
+    if rank is None:
+        return []
+    if rank >= _derived_fallback_rank_limit(budgets.max_columns_per_table):
+        return []
+    if not _derived_pair_prefilter(
+        left_sig=source_sig,
+        right_sig=target_sig,
+        name_similarity=name_similarity,
+    ):
+        return []
+    variants = derive_candidates_for_column(
+        signature=source_sig,
+        table_df=source_table.df,
+        sample_rows=sample_rows,
+        sample_seed=sample_seed,
+        budgets=budgets,
+    )
+    derived_attempted.add(source_key)
+    if variants:
+        derived_cache[source_key] = variants
+    return variants
+
+
+def _derived_is_ambiguous(
+    transformed_fk_values: frozenset[str],
+    target_table: Table,
+    target_column: str,
+    signatures: SignatureCache,
+    max_ambiguous_targets: int,
+) -> bool:
+    threshold = 0.6
+    ambiguous = 0
+    for candidate_column in target_table.df.columns:
+        if candidate_column == target_column:
+            continue
+        candidate_sig = signatures[(target_table.name, candidate_column)]
+        if not candidate_sig.sampled_unique_set:
+            continue
+        fk_values = _normalize_transformed_values_for_target(
+            transformed_values=transformed_fk_values,
+            target_sig=candidate_sig,
+        )
+        if not fk_values:
+            continue
+        inclusion = _estimated_inclusion_from_sets(
+            left_set=fk_values,
+            right_set=candidate_sig.sampled_unique_set,
+            right_distinct_count=candidate_sig.distinct_count,
+        )
+        if inclusion >= threshold:
+            ambiguous += 1
+            if ambiguous > max_ambiguous_targets:
+                return True
+    return False
+
+
+def _is_direct_identifier_namespace_collision(
+    fk_sig: ColumnSignature,
+    pk_sig: ColumnSignature,
+    inclusion_fk_in_pk: float,
+    inclusion_pk_in_fk: float,
+    derived: DerivedTransform | None,
+) -> bool:
+    """
+    Reject highly overlapping direct identifier joins across incompatible namespaces.
+
+    This targets one-to-one numeric-domain collisions such as `payment_id <-> refund_id`
+    while preserving valid many-to-one FK->PK joins.
+    """
+    if derived is not None:
+        return False
+    if not (_is_identifier(fk_sig) and _is_identifier(pk_sig)):
+        return False
+    if not (fk_sig.name_features.entity_core and pk_sig.name_features.entity_core):
+        return False
+    if entity_cores_compatible(fk_sig, pk_sig):
+        return False
+    if fk_sig.uniqueness_ratio < 0.98 or pk_sig.uniqueness_ratio < 0.98:
+        return False
+    return inclusion_fk_in_pk >= 0.98 and inclusion_pk_in_fk >= 0.98
+
+
+def _temporal_signature_equivalent(
+    left: ColumnSignature,
+    right: ColumnSignature,
+) -> bool:
+    if not (left.name_features.date_like and right.name_features.date_like):
+        return False
+    if not left.sampled_unique_set or not right.sampled_unique_set:
+        return False
+    if _jaccard(left.sampled_unique_set, right.sampled_unique_set) < 0.995:
+        return False
+    inclusion_lr = _estimated_inclusion_from_sets(
+        left_set=left.sampled_unique_set,
+        right_set=right.sampled_unique_set,
+        right_distinct_count=right.distinct_count,
+    )
+    inclusion_rl = _estimated_inclusion_from_sets(
+        left_set=right.sampled_unique_set,
+        right_set=left.sampled_unique_set,
+        right_distinct_count=left.distinct_count,
+    )
+    return inclusion_lr >= 0.995 and inclusion_rl >= 0.995
+
+
+def _temporal_candidate_preference(
+    candidate: JoinCandidate,
+    signatures: SignatureCache,
+) -> tuple[int, int, float, float, int]:
+    fk_sig = signatures[(candidate.left_table, candidate.left_column)]
+    pk_sig = signatures[(candidate.right_table, candidate.right_column)]
+    fk_idish = fk_sig.name_features.id_like or fk_sig.name_features.key_like
+    pk_idish = pk_sig.name_features.id_like or pk_sig.name_features.key_like
+    role_match = int(fk_idish == pk_idish)
+    pk_plain_date = int("date" in pk_sig.name_features.tokens and not pk_idish)
+    return (
+        role_match,
+        pk_plain_date,
+        _name_similarity(fk_sig, pk_sig),
+        candidate.confidence,
+        -len(pk_sig.column_name),
+    )
+
+
+def _dedupe_temporal_equivalent_targets(
+    candidates: list[JoinCandidate],
+    signatures: SignatureCache,
+) -> list[JoinCandidate]:
+    """
+    For one FK date-like column into one table, keep one best equivalent temporal target.
+    """
+    grouped: dict[tuple[str, str, str], list[JoinCandidate]] = {}
+    passthrough: list[JoinCandidate] = []
+    for candidate in candidates:
+        if candidate.derived is not None:
+            passthrough.append(candidate)
+            continue
+        fk_sig = signatures[(candidate.left_table, candidate.left_column)]
+        pk_sig = signatures[(candidate.right_table, candidate.right_column)]
+        if not (fk_sig.name_features.date_like and pk_sig.name_features.date_like):
+            passthrough.append(candidate)
+            continue
+        group_key = (candidate.left_table, candidate.left_column, candidate.right_table)
+        grouped.setdefault(group_key, []).append(candidate)
+
+    deduped: list[JoinCandidate] = []
+    for group in grouped.values():
+        if len(group) == 1:
+            deduped.extend(group)
+            continue
+        ordered = sorted(
+            group,
+            key=lambda candidate: _temporal_candidate_preference(candidate, signatures),
+            reverse=True,
+        )
+        kept: list[JoinCandidate] = []
+        kept_right_sigs: list[ColumnSignature] = []
+        for candidate in ordered:
+            candidate_pk = signatures[(candidate.right_table, candidate.right_column)]
+            equivalent_to_kept = any(
+                _temporal_signature_equivalent(candidate_pk, kept_pk)
+                for kept_pk in kept_right_sigs
+            )
+            if equivalent_to_kept:
+                continue
+            kept.append(candidate)
+            kept_right_sigs.append(candidate_pk)
+        deduped.extend(kept)
+
+    deduped.extend(passthrough)
+    return deduped
+
+
+def _score_candidate(
+    *,
+    fk_sig: ColumnSignature,
+    pk_sig: ColumnSignature,
+    fk_values: frozenset[object],
+    pk_values: frozenset[object],
+    inclusion_fk_in_pk: float,
+    inclusion_pk_in_fk: float,
+    type_score: float,
+    normalized_weights: dict[str, float],
+    effective_date_caps: dict[str, float],
+    min_confidence: float,
+    identifier_hubs: dict[str, tuple[str, str]],
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+    bridge_tables: set[str],
+    mirror_pair: bool,
+    distinct_low_card_threshold: int,
+    derived: DerivedTransform | None,
+) -> JoinCandidate | None:
+    if _is_direct_identifier_namespace_collision(
+        fk_sig=fk_sig,
+        pk_sig=pk_sig,
+        inclusion_fk_in_pk=inclusion_fk_in_pk,
+        inclusion_pk_in_fk=inclusion_pk_in_fk,
+        derived=derived,
+    ):
+        return None
+    name_similarity = _name_similarity(fk_sig, pk_sig)
+    identifier_anchor = _identifier_anchor(
+        fk=fk_sig,
+        pk=pk_sig,
+        name_similarity=name_similarity,
+    )
+    sibling_non_hub = False
+    if (
+        _is_identifier(fk_sig)
+        and _is_identifier(pk_sig)
+        and fk_sig.name_features.entity_core
+        and fk_sig.name_features.entity_core == pk_sig.name_features.entity_core
+    ):
+        hub_group = fk_sig.name_features.entity_core or fk_sig.name_features.normalized
+        hub_key = identifier_hubs.get(hub_group)
+        if hub_key is not None:
+            fk_key = (fk_sig.table_name, fk_sig.column_name)
+            pk_key = (pk_sig.table_name, pk_sig.column_name)
+            sibling_non_hub = fk_key != hub_key and pk_key != hub_key
+    spurious_guard = _spurious_guard(
+        fk=fk_sig,
+        pk=pk_sig,
+        name_similarity=name_similarity,
+        inclusion_fk_in_pk=inclusion_fk_in_pk,
+        sibling_non_hub=sibling_non_hub,
+        mirror_pair=mirror_pair,
+        canonical_penalty=(
+            _canonical_identifier_penalty(
+                sig=fk_sig,
+                table_identifier_winners=table_identifier_winners,
+            )
+            * _canonical_identifier_penalty(
+                sig=pk_sig,
+                table_identifier_winners=table_identifier_winners,
+            )
+        ),
+        distinct_low_card_threshold=distinct_low_card_threshold,
+    )
+    if spurious_guard == 0.0:
+        return None
+    date_dimension_signal, date_cap, date_override = _date_signal_and_cap(
+        fk=fk_sig,
+        pk=pk_sig,
+        inclusion_fk_in_pk=inclusion_fk_in_pk,
+        date_caps=effective_date_caps,
+    )
+
+    signals = {
+        "type_compatibility": type_score,
+        "name_similarity": name_similarity,
+        "identifier_anchor": identifier_anchor,
+        "inclusion_fk_in_pk": inclusion_fk_in_pk,
+        "inclusion_pk_in_fk": inclusion_pk_in_fk,
+        "jaccard": _jaccard(fk_values, pk_values),
+        "cardinality_alignment": _cardinality_alignment(
+            fk_uniqueness=fk_sig.uniqueness_ratio,
+            pk_uniqueness=pk_sig.uniqueness_ratio,
+        ),
+        "date_dimension_signal": date_dimension_signal,
+        "spurious_guard": spurious_guard,
+        "derived_penalty": 0.85 if derived is not None else 1.0,
+    }
+
+    confidence = _weighted_score(signals=signals, weights=normalized_weights)
+    confidence = min(confidence, date_cap)
+    if confidence < min_confidence:
+        return None
+
+    return JoinCandidate(
+        left_table=fk_sig.table_name,
+        left_column=fk_sig.column_name,
+        right_table=pk_sig.table_name,
+        right_column=pk_sig.column_name,
+        confidence=confidence,
+        relationship_guess=_relationship_guess(
+            fk=fk_sig,
+            pk=pk_sig,
+            bridge_tables=bridge_tables,
+            date_override=date_override,
+        ),
+        breakdown=JoinScoreBreakdown(
+            signals={key: float(value) for key, value in signals.items()},
+            weights={key: float(value) for key, value in normalized_weights.items()},
+            weighted_score=confidence,
+        ),
+        derived=derived,
+    )
+
+
+def _candidate_sort_key(candidate: JoinCandidate) -> tuple[float, str, str, str, str]:
+    return (
+        candidate.confidence,
+        candidate.left_table.lower(),
+        candidate.left_column.lower(),
+        candidate.right_table.lower(),
+        candidate.right_column.lower(),
+    )
+
+
+def _should_replace_candidate(current: JoinCandidate, incoming: JoinCandidate) -> bool:
+    confidence_margin = incoming.confidence - current.confidence
+    if confidence_margin > 1e-12:
+        return True
+    if confidence_margin < -1e-12:
+        return False
+    if current.derived is not None and incoming.derived is None:
+        return True
+    if current.derived is None and incoming.derived is not None:
+        return False
+    return _candidate_sort_key(incoming) > _candidate_sort_key(current)
+
+
 def find_join_candidates(
     tables: list[Table],
     sample_rows: int = 10_000,
@@ -546,6 +969,11 @@ def find_join_candidates(
     near_unique_threshold: float = DEFAULT_NEAR_UNIQUE_THRESHOLD,
     distinct_low_card_threshold: int = DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
     date_caps: dict[str, float] | None = None,
+    derived_joins_enabled: bool = DERIVED_JOINS_ENABLED,
+    derived_max_transforms_per_column: int = DERIVED_MAX_TRANSFORMS_PER_COLUMN,
+    derived_max_columns_per_table: int = DERIVED_MAX_COLUMNS_PER_TABLE,
+    derived_min_distinct: int = DERIVED_MIN_DISTINCT,
+    derived_max_ambiguous_targets: int = DERIVED_MAX_AMBIGUOUS_TARGETS,
     signature_cache: SignatureCache | None = None,
 ) -> list[JoinCandidate]:
     """Find join candidates using cached column signatures."""
@@ -567,7 +995,38 @@ def find_join_candidates(
         }
         for table in tables
     }
-    candidates: list[JoinCandidate] = []
+    derived_budgets = DerivedBudgets(
+        max_transforms_per_column=max(1, int(derived_max_transforms_per_column)),
+        max_columns_per_table=max(1, int(derived_max_columns_per_table)),
+        min_distinct=max(1, int(derived_min_distinct)),
+    )
+    derived_cache: dict[tuple[str, str], list[DerivedCandidate]] = {}
+    derived_attempted: set[tuple[str, str]] = set()
+    derived_rank_index: dict[tuple[str, str], int] = {}
+    if derived_joins_enabled:
+        max_columns_per_table = max(0, int(derived_budgets.max_columns_per_table))
+        for table in tables:
+            table_sigs = [signatures[(table.name, column)] for column in table.df.columns]
+            ranked_sources = rank_derived_source_columns(
+                signatures=table_sigs,
+                budgets=derived_budgets,
+            )
+            for rank, signature in enumerate(ranked_sources):
+                source_key = (signature.table_name, signature.column_name)
+                derived_rank_index[source_key] = rank
+                if rank >= max_columns_per_table:
+                    continue
+                variants = derive_candidates_for_column(
+                    signature=signature,
+                    table_df=table.df,
+                    sample_rows=sample_rows,
+                    sample_seed=sample_seed,
+                    budgets=derived_budgets,
+                )
+                derived_attempted.add(source_key)
+                if variants:
+                    derived_cache[source_key] = variants
+    best_candidates: dict[tuple[str, str, str, str], JoinCandidate] = {}
 
     for left_table, right_table in itertools.combinations(tables, 2):
         mirror_pair = _is_mirror_pair(left_table.name, right_table.name)
@@ -593,113 +1052,213 @@ def find_join_candidates(
                     continue
 
                 type_score = _type_compatibility(left_sig.dtype, right_sig.dtype)
-                if type_score == 0.0:
-                    continue
+                allow_direct = type_score > 0.0
 
+                pair_candidates: list[JoinCandidate] = []
                 overlap = left_sig.sampled_unique_set & right_sig.sampled_unique_set
-                if not overlap:
-                    continue
+                if allow_direct and overlap:
+                    inclusion_lr = _estimated_inclusion(left_sig, right_sig)
+                    inclusion_rl = _estimated_inclusion(right_sig, left_sig)
+                    fk_sig, pk_sig, inclusion_fk_in_pk, inclusion_pk_in_fk = _normalize_direction(
+                        left=left_sig,
+                        right=right_sig,
+                        inclusion_lr=inclusion_lr,
+                        inclusion_rl=inclusion_rl,
+                    )
+                    fk_values = (
+                        left_sig.sampled_unique_set
+                        if fk_sig.table_name == left_sig.table_name
+                        and fk_sig.column_name == left_sig.column_name
+                        else right_sig.sampled_unique_set
+                    )
+                    pk_values = (
+                        right_sig.sampled_unique_set
+                        if pk_sig.table_name == right_sig.table_name
+                        and pk_sig.column_name == right_sig.column_name
+                        else left_sig.sampled_unique_set
+                    )
+                    direct_candidate = _score_candidate(
+                        fk_sig=fk_sig,
+                        pk_sig=pk_sig,
+                        fk_values=fk_values,
+                        pk_values=pk_values,
+                        inclusion_fk_in_pk=inclusion_fk_in_pk,
+                        inclusion_pk_in_fk=inclusion_pk_in_fk,
+                        type_score=type_score,
+                        normalized_weights=normalized_weights,
+                        effective_date_caps=effective_date_caps,
+                        min_confidence=min_confidence,
+                        identifier_hubs=identifier_hubs,
+                        table_identifier_winners=table_identifier_winners,
+                        bridge_tables=bridge_tables,
+                        mirror_pair=mirror_pair,
+                        distinct_low_card_threshold=distinct_low_card_threshold,
+                        derived=None,
+                    )
+                    if direct_candidate is not None:
+                        pair_candidates.append(direct_candidate)
 
-                inclusion_lr = _estimated_inclusion(left_sig, right_sig)
-                inclusion_rl = _estimated_inclusion(right_sig, left_sig)
-                fk_sig, pk_sig, inclusion_fk_in_pk, inclusion_pk_in_fk = _normalize_direction(
-                    left=left_sig,
-                    right=right_sig,
-                    inclusion_lr=inclusion_lr,
-                    inclusion_rl=inclusion_rl,
-                )
-                name_similarity = _name_similarity(fk_sig, pk_sig)
-                identifier_anchor = _identifier_anchor(
-                    fk=fk_sig,
-                    pk=pk_sig,
-                    name_similarity=name_similarity,
-                )
-                sibling_non_hub = False
-                if (
-                    _is_identifier(fk_sig)
-                    and _is_identifier(pk_sig)
-                    and fk_sig.name_features.entity_core
-                    and fk_sig.name_features.entity_core == pk_sig.name_features.entity_core
-                ):
-                    hub_group = fk_sig.name_features.entity_core or fk_sig.name_features.normalized
-                    hub_key = identifier_hubs.get(hub_group)
-                    if hub_key is not None:
-                        fk_key = (fk_sig.table_name, fk_sig.column_name)
-                        pk_key = (pk_sig.table_name, pk_sig.column_name)
-                        sibling_non_hub = fk_key != hub_key and pk_key != hub_key
-                spurious_guard = _spurious_guard(
-                    fk=fk_sig,
-                    pk=pk_sig,
-                    name_similarity=name_similarity,
-                    inclusion_fk_in_pk=inclusion_fk_in_pk,
-                    sibling_non_hub=sibling_non_hub,
-                    mirror_pair=mirror_pair,
-                    canonical_penalty=(
-                        _canonical_identifier_penalty(
-                            sig=fk_sig,
-                            table_identifier_winners=table_identifier_winners,
-                        )
-                        * _canonical_identifier_penalty(
-                            sig=pk_sig,
-                            table_identifier_winners=table_identifier_winners,
-                        )
-                    ),
-                    distinct_low_card_threshold=distinct_low_card_threshold,
-                )
-                if spurious_guard == 0.0:
-                    continue
-                date_dimension_signal, date_cap, date_override = _date_signal_and_cap(
-                    fk=fk_sig,
-                    pk=pk_sig,
-                    inclusion_fk_in_pk=inclusion_fk_in_pk,
-                    date_caps=effective_date_caps,
-                )
-
-                signals = {
-                    "type_compatibility": type_score,
-                    "name_similarity": name_similarity,
-                    "identifier_anchor": identifier_anchor,
-                    "inclusion_fk_in_pk": inclusion_fk_in_pk,
-                    "inclusion_pk_in_fk": inclusion_pk_in_fk,
-                    "jaccard": _jaccard(fk_sig.sampled_unique_set, pk_sig.sampled_unique_set),
-                    "cardinality_alignment": _cardinality_alignment(
-                        fk_uniqueness=fk_sig.uniqueness_ratio,
-                        pk_uniqueness=pk_sig.uniqueness_ratio,
-                    ),
-                    "date_dimension_signal": date_dimension_signal,
-                    "spurious_guard": spurious_guard,
-                }
-
-                confidence = _weighted_score(signals=signals, weights=normalized_weights)
-                confidence = min(confidence, date_cap)
-                if confidence < min_confidence:
-                    continue
-
-                candidates.append(
-                    JoinCandidate(
-                        left_table=fk_sig.table_name,
-                        left_column=fk_sig.column_name,
-                        right_table=pk_sig.table_name,
-                        right_column=pk_sig.column_name,
-                        confidence=confidence,
-                        relationship_guess=_relationship_guess(
-                            fk=fk_sig,
-                            pk=pk_sig,
-                            bridge_tables=bridge_tables,
-                            date_override=date_override,
-                        ),
-                        breakdown=JoinScoreBreakdown(
-                            signals={key: float(value) for key, value in signals.items()},
-                            weights={
-                                key: float(value) for key, value in normalized_weights.items()
-                            },
-                            weighted_score=confidence,
-                        ),
+                name_similarity = _name_similarity(left_sig, right_sig)
+                can_try_derived = (
+                    bool(derived_rank_index)
+                    and _derived_pair_prefilter(
+                        left_sig=left_sig,
+                        right_sig=right_sig,
+                        name_similarity=name_similarity,
                     )
                 )
+                if can_try_derived:
+                    left_variants = _get_or_build_derived_variants(
+                        source_sig=left_sig,
+                        target_sig=right_sig,
+                        source_table=left_table,
+                        sample_rows=sample_rows,
+                        sample_seed=sample_seed,
+                        budgets=derived_budgets,
+                        derived_cache=derived_cache,
+                        derived_attempted=derived_attempted,
+                        derived_rank_index=derived_rank_index,
+                        name_similarity=name_similarity,
+                    )
+                    for variant in left_variants:
+                        if not _is_preferred_fk_direction(fk=left_sig, pk=right_sig):
+                            continue
+                        fk_values = _normalize_transformed_values_for_target(
+                            transformed_values=variant.transformed_values_sample_set,
+                            target_sig=right_sig,
+                        )
+                        if not (fk_values & right_sig.sampled_unique_set):
+                            continue
+                        if _derived_is_ambiguous(
+                            transformed_fk_values=variant.transformed_values_sample_set,
+                            target_table=right_table,
+                            target_column=right_sig.column_name,
+                            signatures=signatures,
+                            max_ambiguous_targets=max(0, int(derived_max_ambiguous_targets)),
+                        ):
+                            continue
+                        inclusion_fk_in_pk = _estimated_inclusion_from_sets(
+                            left_set=fk_values,
+                            right_set=right_sig.sampled_unique_set,
+                            right_distinct_count=right_sig.distinct_count,
+                        )
+                        inclusion_pk_in_fk = _estimated_inclusion_from_sets(
+                            left_set=right_sig.sampled_unique_set,
+                            right_set=fk_values,
+                            right_distinct_count=max(len(fk_values), 1),
+                        )
+                        derived_meta = DerivedTransform(
+                            transform_id=variant.transform_id,
+                            params=dict(variant.params),
+                            derived_from_table=left_sig.table_name,
+                            derived_from_column=left_sig.column_name,
+                            example_mappings=variant.example_mappings[:3],
+                        )
+                        derived_candidate = _score_candidate(
+                            fk_sig=left_sig,
+                            pk_sig=right_sig,
+                            fk_values=fk_values,
+                            pk_values=right_sig.sampled_unique_set,
+                            inclusion_fk_in_pk=inclusion_fk_in_pk,
+                            inclusion_pk_in_fk=inclusion_pk_in_fk,
+                            type_score=type_score,
+                            normalized_weights=normalized_weights,
+                            effective_date_caps=effective_date_caps,
+                            min_confidence=min_confidence,
+                            identifier_hubs=identifier_hubs,
+                            table_identifier_winners=table_identifier_winners,
+                            bridge_tables=bridge_tables,
+                            mirror_pair=mirror_pair,
+                            distinct_low_card_threshold=distinct_low_card_threshold,
+                            derived=derived_meta,
+                        )
+                        if derived_candidate is not None:
+                            pair_candidates.append(derived_candidate)
 
+                    right_variants = _get_or_build_derived_variants(
+                        source_sig=right_sig,
+                        target_sig=left_sig,
+                        source_table=right_table,
+                        sample_rows=sample_rows,
+                        sample_seed=sample_seed,
+                        budgets=derived_budgets,
+                        derived_cache=derived_cache,
+                        derived_attempted=derived_attempted,
+                        derived_rank_index=derived_rank_index,
+                        name_similarity=name_similarity,
+                    )
+                    for variant in right_variants:
+                        if not _is_preferred_fk_direction(fk=right_sig, pk=left_sig):
+                            continue
+                        fk_values = _normalize_transformed_values_for_target(
+                            transformed_values=variant.transformed_values_sample_set,
+                            target_sig=left_sig,
+                        )
+                        if not (fk_values & left_sig.sampled_unique_set):
+                            continue
+                        if _derived_is_ambiguous(
+                            transformed_fk_values=variant.transformed_values_sample_set,
+                            target_table=left_table,
+                            target_column=left_sig.column_name,
+                            signatures=signatures,
+                            max_ambiguous_targets=max(0, int(derived_max_ambiguous_targets)),
+                        ):
+                            continue
+                        inclusion_fk_in_pk = _estimated_inclusion_from_sets(
+                            left_set=fk_values,
+                            right_set=left_sig.sampled_unique_set,
+                            right_distinct_count=left_sig.distinct_count,
+                        )
+                        inclusion_pk_in_fk = _estimated_inclusion_from_sets(
+                            left_set=left_sig.sampled_unique_set,
+                            right_set=fk_values,
+                            right_distinct_count=max(len(fk_values), 1),
+                        )
+                        derived_meta = DerivedTransform(
+                            transform_id=variant.transform_id,
+                            params=dict(variant.params),
+                            derived_from_table=right_sig.table_name,
+                            derived_from_column=right_sig.column_name,
+                            example_mappings=variant.example_mappings[:3],
+                        )
+                        derived_candidate = _score_candidate(
+                            fk_sig=right_sig,
+                            pk_sig=left_sig,
+                            fk_values=fk_values,
+                            pk_values=left_sig.sampled_unique_set,
+                            inclusion_fk_in_pk=inclusion_fk_in_pk,
+                            inclusion_pk_in_fk=inclusion_pk_in_fk,
+                            type_score=type_score,
+                            normalized_weights=normalized_weights,
+                            effective_date_caps=effective_date_caps,
+                            min_confidence=min_confidence,
+                            identifier_hubs=identifier_hubs,
+                            table_identifier_winners=table_identifier_winners,
+                            bridge_tables=bridge_tables,
+                            mirror_pair=mirror_pair,
+                            distinct_low_card_threshold=distinct_low_card_threshold,
+                            derived=derived_meta,
+                        )
+                        if derived_candidate is not None:
+                            pair_candidates.append(derived_candidate)
+
+                for candidate in pair_candidates:
+                    key = (
+                        candidate.left_table,
+                        candidate.left_column,
+                        candidate.right_table,
+                        candidate.right_column,
+                    )
+                    current = best_candidates.get(key)
+                    if current is None or _should_replace_candidate(current=current, incoming=candidate):
+                        best_candidates[key] = candidate
+
+    final_candidates = _dedupe_temporal_equivalent_targets(
+        candidates=list(best_candidates.values()),
+        signatures=signatures,
+    )
     return sorted(
-        candidates,
+        final_candidates,
         key=lambda candidate: (
             -candidate.confidence,
             candidate.left_table.lower(),

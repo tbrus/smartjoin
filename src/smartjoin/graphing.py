@@ -56,6 +56,7 @@ def build_join_graph(
                 edge_rank=rank,
                 confidence=join.confidence,
                 relationship_guess=join.relationship_guess,
+                derived=join.derived.model_dump(mode="json") if join.derived is not None else None,
             )
 
     return graph
@@ -84,22 +85,23 @@ def graph_to_report(
     if graph.is_multigraph():
         edge_iter = graph.edges(keys=True, data=True)
         for left_table, right_table, _edge_key, attributes in edge_iter:
-            edge = JoinGraphEdge(
-                left_table=str(left_table),
-                right_table=str(right_table),
-                left_column=str(attributes.get("left_column", "")),
-                right_column=str(attributes.get("right_column", "")),
+                edge = JoinGraphEdge(
+                    left_table=str(left_table),
+                    right_table=str(right_table),
+                    left_column=str(attributes.get("left_column", "")),
+                    right_column=str(attributes.get("right_column", "")),
                 edge_group_id=str(
                     attributes.get(
                         "edge_group_id",
                         _edge_group_id(str(left_table), str(right_table)),
                     )
-                ),
-                edge_rank=int(attributes.get("edge_rank", 1)),
-                confidence=float(attributes.get("confidence", 0.0)),
-                relationship_guess=str(attributes.get("relationship_guess", "unknown")),
-            )
-            edges.append(edge)
+                    ),
+                    edge_rank=int(attributes.get("edge_rank", 1)),
+                    confidence=float(attributes.get("confidence", 0.0)),
+                    relationship_guess=str(attributes.get("relationship_guess", "unknown")),
+                    derived=attributes.get("derived"),
+                )
+                edges.append(edge)
     else:
         for left_table, right_table, attributes in graph.edges(data=True):
             edge = JoinGraphEdge(
@@ -116,6 +118,7 @@ def graph_to_report(
                 edge_rank=int(attributes.get("edge_rank", 1)),
                 confidence=float(attributes.get("confidence", 0.0)),
                 relationship_guess=str(attributes.get("relationship_guess", "unknown")),
+                derived=attributes.get("derived"),
             )
             edges.append(edge)
     edges = sorted(

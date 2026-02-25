@@ -17,6 +17,11 @@ DEFAULT_DATE_CAPS: dict[str, float] = {
     "temporal_overlap_signal": 0.35,
     "mixed_temporal_signal": 0.60,
 }
+DERIVED_JOINS_ENABLED = True
+DERIVED_MAX_TRANSFORMS_PER_COLUMN = 2
+DERIVED_MAX_COLUMNS_PER_TABLE = 6
+DERIVED_MIN_DISTINCT = 20
+DERIVED_MAX_AMBIGUOUS_TARGETS = 1
 
 
 def merge_date_caps(overrides: dict[str, float] | None = None) -> dict[str, float]:
@@ -40,6 +45,11 @@ class AnalysisSettings:
     distinct_low_card_threshold: int = DEFAULT_DISTINCT_LOW_CARD_THRESHOLD
     near_unique_threshold: float = DEFAULT_NEAR_UNIQUE_THRESHOLD
     date_caps: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_DATE_CAPS))
+    derived_joins_enabled: bool = DERIVED_JOINS_ENABLED
+    derived_max_transforms_per_column: int = DERIVED_MAX_TRANSFORMS_PER_COLUMN
+    derived_max_columns_per_table: int = DERIVED_MAX_COLUMNS_PER_TABLE
+    derived_min_distinct: int = DERIVED_MIN_DISTINCT
+    derived_max_ambiguous_targets: int = DERIVED_MAX_AMBIGUOUS_TARGETS
 
     def to_report_dict(self) -> dict[str, Any]:
         """Serialize as JSON-safe dict for `AnalysisReport.settings`."""
@@ -51,4 +61,9 @@ class AnalysisSettings:
             "distinct_low_card_threshold": int(self.distinct_low_card_threshold),
             "near_unique_threshold": float(self.near_unique_threshold),
             "date_caps": {key: float(value) for key, value in self.date_caps.items()},
+            "derived_joins_enabled": bool(self.derived_joins_enabled),
+            "derived_max_transforms_per_column": int(self.derived_max_transforms_per_column),
+            "derived_max_columns_per_table": int(self.derived_max_columns_per_table),
+            "derived_min_distinct": int(self.derived_min_distinct),
+            "derived_max_ambiguous_targets": int(self.derived_max_ambiguous_targets),
         }

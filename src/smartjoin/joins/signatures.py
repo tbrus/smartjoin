@@ -96,22 +96,6 @@ def _build_name_features(column_name: str) -> NameFeatures:
     key_like = "key" in tokens or "ref" in tokens
     code_like = "code" in tokens
     identifier_like = id_like or key_like
-    entity_aliases = {
-        "acct": "account",
-        "acc": "account",
-        "cust": "customer",
-        "usr": "user",
-        "pt": "patient",
-        "prv": "provider",
-        "fac": "facility",
-        "sub": "subscription",
-        "inv": "invoice",
-        "pay": "payment",
-        "enc": "encounter",
-        "clm": "claim",
-        "ftr": "feature",
-        "wsp": "workspace",
-    }
     qualifier_tokens = {
         "id",
         "key",
@@ -125,8 +109,18 @@ def _build_name_features(column_name: str) -> NameFeatures:
         "primary",
         "secondary",
     }
+
+    def _normalize_entity_token(token: str) -> str:
+        # Generic token normalization for singular/plural variants.
+        normalized_token = token.lower()
+        if normalized_token.endswith("ies") and len(normalized_token) > 3:
+            return normalized_token[:-3] + "y"
+        if normalized_token.endswith("s") and len(normalized_token) > 3:
+            return normalized_token[:-1]
+        return normalized_token
+
     entity_core = "".join(
-        entity_aliases.get(token, token)
+        _normalize_entity_token(token)
         for token in tokens
         if token not in qualifier_tokens
     )

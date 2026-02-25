@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,74 @@ def _load_manifest(path: Path) -> dict[str, Any] | None:
         return json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
+
+
+def _example_match_key(value: Any) -> object | None:
+    if value is None:
+        return None
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, (int, float, bool)):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    upper = text.upper()
+    prefixed_numeric = re.fullmatch(r"0*([A-Z]+)[_\-\s]*0*([0-9]+)", upper)
+    if prefixed_numeric:
+        prefix, digits = prefixed_numeric.groups()
+        return f"{prefix}{int(digits)}"
+    numeric = re.fullmatch(r"0*([0-9]+)", upper)
+    if numeric:
+        return str(int(numeric.group(1)))
+    return upper
+
+
+def _example_display_value(value: Any) -> str:
+    jsonable = _jsonable(value)
+    if jsonable is None:
+        return "null"
+    return str(jsonable)
+
+
+def _build_original_example_mappings(
+    left_series: Any,
+    right_series: Any,
+    max_examples: int = 3,
+    max_distinct_scan: int = 20_000,
+) -> list[dict[str, str]]:
+    left_values = (
+        left_series.drop_nulls().unique(maintain_order=True).head(max_distinct_scan).to_list()
+    )
+    right_values = (
+        right_series.drop_nulls().unique(maintain_order=True).head(max_distinct_scan).to_list()
+    )
+    right_lookup: dict[object, str] = {}
+    for value in right_values:
+        key = _example_match_key(value)
+        if key is None or key in right_lookup:
+            continue
+        right_lookup[key] = _example_display_value(value)
+
+    examples: list[dict[str, str]] = []
+    seen_keys: set[object] = set()
+    for value in left_values:
+        key = _example_match_key(value)
+        if key is None or key in seen_keys:
+            continue
+        right_value = right_lookup.get(key)
+        if right_value is None:
+            continue
+        examples.append(
+            {
+                "from": _example_display_value(value),
+                "to": right_value,
+            }
+        )
+        seen_keys.add(key)
+        if len(examples) >= max_examples:
+            break
+    return examples
 
 
 def _build_payload(
@@ -132,6 +201,33 @@ def _build_payload(
         )
 
     manifest = _load_manifest(path)
+    report_payload = report.model_dump(mode="json")
+    table_by_name = {table.name: table for table in tables}
+    for join in report_payload.get("joins", []):
+        if not isinstance(join, dict):
+            continue
+        if join.get("derived") is not None:
+            continue
+        left_table = join.get("left_table")
+        left_column = join.get("left_column")
+        right_table = join.get("right_table")
+        right_column = join.get("right_column")
+        if not all(
+            isinstance(item, str)
+            for item in [left_table, left_column, right_table, right_column]
+        ):
+            continue
+        left = table_by_name.get(left_table)
+        right = table_by_name.get(right_table)
+        if left is None or right is None:
+            continue
+        if left_column not in left.df.columns or right_column not in right.df.columns:
+            continue
+        join["example_mappings"] = _build_original_example_mappings(
+            left_series=left.df.get_column(left_column),
+            right_series=right.df.get_column(right_column),
+            max_examples=3,
+        )
 
     return {
         "meta": {
@@ -149,7 +245,7 @@ def _build_payload(
             "profile_entropy_cap": profile_entropy_cap,
         },
         "manifest": manifest,
-        "report": report.model_dump(mode="json"),
+        "report": report_payload,
         "tables": table_payload,
     }
 
@@ -465,6 +561,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .edge-layer path.edge-missing{stroke:var(--edge-missing)}
     .edge-layer path.edge-unexpected{stroke:var(--edge-unexpected)}
     .edge-layer path.edge-unknown{stroke:var(--edge)}
+    .edge-layer path.derived-edge{stroke-dasharray:6 6}
     .edge-layer path.selected{
       stroke-width:3.5;
       opacity:1;
@@ -945,14 +1042,61 @@ DEBUG_SITE_HTML = """<!doctype html>
         unknown: "Unlabeled Join",
       };
       const label = labelMap[truthState] || labelMap.unknown;
+      const derived = rel.derived || null;
+      const derivedExamples = (derived?.example_mappings || [])
+        .slice(0, 3)
+        .map((item) => {
+          const from = String(item?.from ?? "");
+          const to = String(item?.to ?? "");
+          if (!from && !to) return "";
+          return `<div>${from} -> ${to}</div>`;
+        })
+        .filter(Boolean)
+        .join("");
+      const originalExamples = (rel.example_mappings || [])
+        .slice(0, 3)
+        .map((item) => {
+          const from = String(item?.from ?? "");
+          const to = String(item?.to ?? "");
+          if (!from && !to) return "";
+          return `<div>${from} -> ${to}</div>`;
+        })
+        .filter(Boolean)
+        .join("");
+      const derivedSection = derived
+        ? `
+          <div style="margin-top:6px; padding:6px 8px; border:1px dashed var(--border); border-radius:8px; background:rgba(255,255,255,0.68);">
+            <div style="font-weight:600; font-size:0.76rem; margin-bottom:3px;">Derived column</div>
+            <div style="font-size:0.75rem;">transform: ${String(derived.transform_id || "")}</div>
+            <div style="font-size:0.75rem;">params: ${JSON.stringify(derived.params || {})}</div>
+            ${derivedExamples ? `<div style="margin-top:4px; font-size:0.74rem;">${derivedExamples}</div>` : ""}
+          </div>
+        `
+        : "";
+      const originalSection = !derived
+        ? `
+          <div style="margin-top:6px; padding:6px 8px; border:1px dashed var(--border); border-radius:8px; background:rgba(255,255,255,0.68);">
+            <div style="font-weight:600; font-size:0.76rem; margin-bottom:3px;">Original column</div>
+            <div style="font-size:0.75rem;">transform: identity</div>
+            <div style="font-size:0.75rem;">params: {}</div>
+            ${
+              originalExamples
+                ? `<div style="margin-top:4px; font-size:0.74rem;">${originalExamples}</div>`
+                : `<div style="margin-top:4px; font-size:0.74rem;">no sample mappings</div>`
+            }
+          </div>
+        `
+        : "";
       const signals = Object.entries(rel.breakdown?.signals || {})
         .map(([k, v]) => `<div><strong>${k}</strong>: ${Number(v).toFixed(3)}</div>`)
         .join("");
       return `
         <div style="font-weight:600; margin-bottom:4px;">${label}</div>
-        <div>${left} → ${right}</div>
+        <div>${left} -> ${right}</div>
         <div style="margin-top:6px; font-size:0.78rem;">confidence: ${rel.confidence.toFixed(3)}</div>
         <div style="font-size:0.78rem;">relationship: ${rel.relationship_guess}</div>
+        ${derivedSection}
+        ${originalSection}
         ${signals ? `<div style="margin-top:6px; font-size:0.75rem;">${signals}</div>` : ""}
       `;
     }
@@ -1125,6 +1269,9 @@ DEBUG_SITE_HTML = """<!doctype html>
         path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`);
         path.setAttribute("stroke-opacity", String(clamp(rel.confidence, 0.25, 1)));
         path.classList.add(`edge-${truthState}`);
+        if (rel.derived) {
+          path.classList.add("derived-edge");
+        }
         if (state.selectedRelationshipKey === relKey) {
           path.classList.add("selected");
         }
@@ -1612,4 +1759,5 @@ def build_debug_site(
     index_path.write_text(rendered_html, encoding="utf-8")
     data_path.write_text(payload_json, encoding="utf-8")
     return index_path, data_path
+
 
