@@ -323,3 +323,59 @@ def test_noncanonical_alias_edge_is_suppressed_when_canonical_exists() -> None:
     )
     assert canonical_present, edge_strings
     assert not alias_present, edge_strings
+
+
+def test_direct_join_outranks_similar_derived_join() -> None:
+    item_dim = Table(
+        name="item_dim",
+        path=Path("item_dim.csv"),
+        df=pl.DataFrame(
+            {
+                "id": [f"x{i:05d}" for i in range(1, 121)],
+            }
+        ),
+    )
+    direct_events = Table(
+        name="direct_events",
+        path=Path("direct_events.csv"),
+        df=pl.DataFrame(
+            {
+                "id": [f"x{((i - 1) % 120) + 1:05d}" for i in range(1, 481)],
+            }
+        ),
+    )
+    derived_events = Table(
+        name="derived_events",
+        path=Path("derived_events.csv"),
+        df=pl.DataFrame(
+            {
+                "id": [f"x#{((i - 1) % 120) + 1:05d}" for i in range(1, 481)],
+            }
+        ),
+    )
+
+    candidates = find_join_candidates(
+        tables=[item_dim, direct_events, derived_events],
+        sample_rows=2_000,
+        min_confidence=0.7,
+        derived_min_distinct=20,
+    )
+
+    direct_join = next(
+        c
+        for c in candidates
+        if {f"{c.left_table}.{c.left_column}", f"{c.right_table}.{c.right_column}"}
+        == {"direct_events.id", "item_dim.id"}
+    )
+    derived_join = next(
+        c
+        for c in candidates
+        if {f"{c.left_table}.{c.left_column}", f"{c.right_table}.{c.right_column}"}
+        == {"derived_events.id", "item_dim.id"}
+    )
+
+    assert direct_join.derived is None
+    assert derived_join.derived is not None
+    assert direct_join.breakdown.signals["inclusion_fk_in_pk"] >= 0.99
+    assert derived_join.breakdown.signals["inclusion_fk_in_pk"] >= 0.99
+    assert direct_join.confidence > derived_join.confidence

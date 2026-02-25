@@ -10,6 +10,7 @@ import polars as pl
 from smartjoin.config import (
     DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
     DEFAULT_NEAR_UNIQUE_THRESHOLD,
+    DERIVED_CONF_MULT,
     DERIVED_JOINS_ENABLED,
     DERIVED_MAX_AMBIGUOUS_TARGETS,
     DERIVED_MAX_COLUMNS_PER_TABLE,
@@ -42,7 +43,6 @@ DEFAULT_JOIN_WEIGHTS: dict[str, float] = {
     "cardinality_alignment": 0.10,
     "date_dimension_signal": 0.05,
     "spurious_guard": 0.07,
-    "derived_penalty": 0.01,
 }
 
 
@@ -1020,6 +1020,7 @@ def _score_candidate(
     bridge_tables: set[str],
     mirror_pair: bool,
     distinct_low_card_threshold: int,
+    derived_conf_mult: float,
     derived: DerivedTransform | None,
 ) -> JoinCandidate | None:
     if _is_direct_identifier_namespace_collision(
@@ -1090,11 +1091,12 @@ def _score_candidate(
         ),
         "date_dimension_signal": date_dimension_signal,
         "spurious_guard": spurious_guard,
-        "derived_penalty": 0.85 if derived is not None else 1.0,
     }
 
     confidence = _weighted_score(signals=signals, weights=normalized_weights)
     confidence = min(confidence, date_cap)
+    if derived is not None:
+        confidence *= derived_conf_mult
     if confidence < min_confidence:
         return None
 
@@ -1156,10 +1158,12 @@ def find_join_candidates(
     derived_max_columns_per_table: int = DERIVED_MAX_COLUMNS_PER_TABLE,
     derived_min_distinct: int = DERIVED_MIN_DISTINCT,
     derived_max_ambiguous_targets: int = DERIVED_MAX_AMBIGUOUS_TARGETS,
+    derived_conf_mult: float = DERIVED_CONF_MULT,
     signature_cache: SignatureCache | None = None,
 ) -> list[JoinCandidate]:
     """Find join candidates using cached column signatures."""
     normalized_weights = _normalize_weights(weights)
+    effective_derived_conf_mult = max(0.0, min(1.0, float(derived_conf_mult)))
     effective_date_caps = merge_date_caps(date_caps)
     signatures = signature_cache or build_column_signatures(
         tables=tables,
@@ -1275,6 +1279,7 @@ def find_join_candidates(
                         bridge_tables=bridge_tables,
                         mirror_pair=mirror_pair,
                         distinct_low_card_threshold=distinct_low_card_threshold,
+                        derived_conf_mult=effective_derived_conf_mult,
                         derived=None,
                     )
                     if direct_candidate is not None:
@@ -1356,6 +1361,7 @@ def find_join_candidates(
                             bridge_tables=bridge_tables,
                             mirror_pair=mirror_pair,
                             distinct_low_card_threshold=distinct_low_card_threshold,
+                            derived_conf_mult=effective_derived_conf_mult,
                             derived=derived_meta,
                         )
                         if derived_candidate is not None:
@@ -1427,6 +1433,7 @@ def find_join_candidates(
                             bridge_tables=bridge_tables,
                             mirror_pair=mirror_pair,
                             distinct_low_card_threshold=distinct_low_card_threshold,
+                            derived_conf_mult=effective_derived_conf_mult,
                             derived=derived_meta,
                         )
                         if derived_candidate is not None:

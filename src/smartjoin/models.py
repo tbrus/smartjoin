@@ -147,6 +147,7 @@ class AnalysisSettingsReport(BaseModel):
     derived_max_columns_per_table: int = Field(ge=1)
     derived_min_distinct: int = Field(ge=1)
     derived_max_ambiguous_targets: int = Field(ge=0)
+    derived_conf_mult: float = Field(ge=0.0, le=1.0)
 
 
 class AnalysisReport(BaseModel):

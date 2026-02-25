@@ -22,6 +22,7 @@ DERIVED_MAX_TRANSFORMS_PER_COLUMN = 2
 DERIVED_MAX_COLUMNS_PER_TABLE = 6
 DERIVED_MIN_DISTINCT = 20
 DERIVED_MAX_AMBIGUOUS_TARGETS = 1
+DERIVED_CONF_MULT = 0.95
 
 
 def merge_date_caps(overrides: dict[str, float] | None = None) -> dict[str, float]:
@@ -50,6 +51,7 @@ class AnalysisSettings:
     derived_max_columns_per_table: int = DERIVED_MAX_COLUMNS_PER_TABLE
     derived_min_distinct: int = DERIVED_MIN_DISTINCT
     derived_max_ambiguous_targets: int = DERIVED_MAX_AMBIGUOUS_TARGETS
+    derived_conf_mult: float = DERIVED_CONF_MULT
 
     def to_report_dict(self) -> dict[str, Any]:
         """Serialize as JSON-safe dict for `AnalysisReport.settings`."""
@@ -66,4 +68,5 @@ class AnalysisSettings:
             "derived_max_columns_per_table": int(self.derived_max_columns_per_table),
             "derived_min_distinct": int(self.derived_min_distinct),
             "derived_max_ambiguous_targets": int(self.derived_max_ambiguous_targets),
+            "derived_conf_mult": float(self.derived_conf_mult),
         }

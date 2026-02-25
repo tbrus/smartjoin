@@ -35,5 +35,6 @@ def test_analysis_report_includes_settings_dump(tmp_path: Path) -> None:
     assert report.settings.near_unique_threshold == 0.88
     assert report.settings.date_caps["temporal_overlap"] == 0.61
     assert report.settings.date_caps["mixed_temporal"] == 0.73
+    assert report.settings.derived_conf_mult == 0.95
     assert report.graph.top_k_per_pair == 2
     assert report.graph.min_confidence == 0.67

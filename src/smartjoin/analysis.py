@@ -8,6 +8,7 @@ from smartjoin.config import (
     DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
     DEFAULT_NEAR_UNIQUE_THRESHOLD,
     DERIVED_JOINS_ENABLED,
+    DERIVED_CONF_MULT,
     DERIVED_MAX_AMBIGUOUS_TARGETS,
     DERIVED_MAX_COLUMNS_PER_TABLE,
     DERIVED_MAX_TRANSFORMS_PER_COLUMN,
@@ -45,6 +46,7 @@ def analyze_path(
     derived_max_columns_per_table: int = DERIVED_MAX_COLUMNS_PER_TABLE,
     derived_min_distinct: int = DERIVED_MIN_DISTINCT,
     derived_max_ambiguous_targets: int = DERIVED_MAX_AMBIGUOUS_TARGETS,
+    derived_conf_mult: float = DERIVED_CONF_MULT,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
     llm_enabled: bool = False,
@@ -65,6 +67,7 @@ def analyze_path(
         derived_max_columns_per_table=derived_max_columns_per_table,
         derived_min_distinct=derived_min_distinct,
         derived_max_ambiguous_targets=derived_max_ambiguous_targets,
+        derived_conf_mult=derived_conf_mult,
     )
     tables = load_tables(
         path=path,
@@ -100,6 +103,7 @@ def analyze_path(
         derived_max_columns_per_table=settings.derived_max_columns_per_table,
         derived_min_distinct=settings.derived_min_distinct,
         derived_max_ambiguous_targets=settings.derived_max_ambiguous_targets,
+        derived_conf_mult=settings.derived_conf_mult,
     )
     joins = apply_semantics_plugin(
         candidates=joins,
@@ -149,6 +153,7 @@ def build_graph_report(
     derived_max_columns_per_table: int = DERIVED_MAX_COLUMNS_PER_TABLE,
     derived_min_distinct: int = DERIVED_MIN_DISTINCT,
     derived_max_ambiguous_targets: int = DERIVED_MAX_AMBIGUOUS_TARGETS,
+    derived_conf_mult: float = DERIVED_CONF_MULT,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
     llm_enabled: bool = False,
@@ -175,6 +180,7 @@ def build_graph_report(
         derived_max_columns_per_table=derived_max_columns_per_table,
         derived_min_distinct=derived_min_distinct,
         derived_max_ambiguous_targets=derived_max_ambiguous_targets,
+        derived_conf_mult=derived_conf_mult,
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
         llm_enabled=llm_enabled,
