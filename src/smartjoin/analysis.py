@@ -23,7 +23,6 @@ from smartjoin.joins import find_join_candidates
 from smartjoin.keys import discover_keys
 from smartjoin.models import AnalysisReport, AnalysisSettingsReport, JoinGraphReport
 from smartjoin.profiling import profile_tables
-from smartjoin.semantics import apply_semantics_plugin
 
 
 def analyze_path(
@@ -49,8 +48,6 @@ def analyze_path(
     derived_conf_mult: float = DERIVED_CONF_MULT,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
-    llm_enabled: bool = False,
-    llm_plugin: str | None = None,
 ) -> AnalysisReport:
     """Run ingestion + profiling + key discovery + join discovery + graph build."""
     resolved_top_k_edges = top_k_edges if top_k_edges is not None else graph_top_k_per_pair
@@ -105,11 +102,6 @@ def analyze_path(
         derived_max_ambiguous_targets=settings.derived_max_ambiguous_targets,
         derived_conf_mult=settings.derived_conf_mult,
     )
-    joins = apply_semantics_plugin(
-        candidates=joins,
-        llm_enabled=llm_enabled,
-        plugin_path=llm_plugin,
-    )
 
     graph = build_join_graph(
         tables=tables,
@@ -156,8 +148,6 @@ def build_graph_report(
     derived_conf_mult: float = DERIVED_CONF_MULT,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
-    llm_enabled: bool = False,
-    llm_plugin: str | None = None,
 ) -> JoinGraphReport:
     """Build only join graph output for CLI graph command."""
     report = analyze_path(
@@ -183,8 +173,6 @@ def build_graph_report(
         derived_conf_mult=derived_conf_mult,
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
-        llm_enabled=llm_enabled,
-        llm_plugin=llm_plugin,
     )
     return report.graph
 

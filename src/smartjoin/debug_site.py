@@ -131,8 +131,6 @@ def _build_payload(
     join_weights: dict[str, float] | None,
     xlsx_sheet_map: dict[str, str] | None,
     json_flatten_depth: int,
-    llm_enabled: bool,
-    llm_plugin: str | None,
     precomputed_report: AnalysisReport | None = None,
 ) -> dict[str, Any]:
     tables = load_tables(
@@ -158,8 +156,6 @@ def _build_payload(
         join_weights=join_weights,
         xlsx_sheet_map=xlsx_sheet_map,
         json_flatten_depth=json_flatten_depth,
-        llm_enabled=llm_enabled,
-        llm_plugin=llm_plugin,
     )
 
     profile_by_table = {table_profile.table_name: table_profile for table_profile in report.tables}
@@ -1724,8 +1720,6 @@ def build_debug_site(
     join_weights: dict[str, float] | None = None,
     xlsx_sheet_map: dict[str, str] | None = None,
     json_flatten_depth: int = 1,
-    llm_enabled: bool = False,
-    llm_plugin: str | None = None,
     precomputed_report: AnalysisReport | None = None,
 ) -> tuple[Path, Path]:
     """Generate debug site artifacts `(index_path, data_path)`."""
@@ -1746,8 +1740,6 @@ def build_debug_site(
         join_weights=join_weights,
         xlsx_sheet_map=xlsx_sheet_map,
         json_flatten_depth=json_flatten_depth,
-        llm_enabled=llm_enabled,
-        llm_plugin=llm_plugin,
         precomputed_report=precomputed_report,
     )
 

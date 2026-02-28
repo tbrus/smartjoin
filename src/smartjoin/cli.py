@@ -141,14 +141,6 @@ def analyze_command(
             help="Per-file sheet mapping, e.g. sales.xlsx=Sheet2",
         ),
     ] = None,
-    llm: Annotated[
-        bool,
-        typer.Option(help="Enable optional semantics plugin tie-breaking."),
-    ] = False,
-    llm_plugin: Annotated[
-        str | None,
-        typer.Option(help="Optional plugin path module:function"),
-    ] = None,
 ) -> None:
     """Analyze a folder of structured files and emit JSON report."""
     if format.lower() != "json":
@@ -170,8 +162,6 @@ def analyze_command(
         join_weights=_parse_weight_assignments(join_weight or []),
         xlsx_sheet_map=_parse_assignments(xlsx_sheet or [], label="xlsx-sheet"),
         json_flatten_depth=json_flatten_depth,
-        llm_enabled=llm,
-        llm_plugin=llm_plugin,
     )
     rendered = report.model_dump_json(indent=2)
 
@@ -260,14 +250,6 @@ def graph_command(
         int,
         typer.Option(min=100, help="Max non-null values used for entropy computation per column."),
     ] = 50_000,
-    llm: Annotated[
-        bool,
-        typer.Option(help="Enable optional semantics plugin tie-breaking."),
-    ] = False,
-    llm_plugin: Annotated[
-        str | None,
-        typer.Option(help="Optional plugin path module:function"),
-    ] = None,
 ) -> None:
     """Build and export join graph as JSON."""
     graph_report = build_graph_report(
@@ -286,8 +268,6 @@ def graph_command(
         join_weights=_parse_weight_assignments(join_weight or []),
         xlsx_sheet_map=_parse_assignments(xlsx_sheet or [], label="xlsx-sheet"),
         json_flatten_depth=json_flatten_depth,
-        llm_enabled=llm,
-        llm_plugin=llm_plugin,
     )
     rendered = graph_report.model_dump_json(indent=2)
 
@@ -421,14 +401,6 @@ def debug_site_command(
         int,
         typer.Option(min=100, help="Max non-null values used for entropy computation per column."),
     ] = 50_000,
-    llm: Annotated[
-        bool,
-        typer.Option(help="Enable optional semantics plugin tie-breaking."),
-    ] = False,
-    llm_plugin: Annotated[
-        str | None,
-        typer.Option(help="Optional plugin path module:function"),
-    ] = None,
 ) -> None:
     """Generate a static debug viewer (HTML + JSON) for table relationships and samples."""
     index_path, data_path = build_debug_site(
@@ -449,8 +421,6 @@ def debug_site_command(
         join_weights=_parse_weight_assignments(join_weight or []),
         xlsx_sheet_map=_parse_assignments(xlsx_sheet or [], label="xlsx-sheet"),
         json_flatten_depth=json_flatten_depth,
-        llm_enabled=llm,
-        llm_plugin=llm_plugin,
     )
     typer.echo(f"Wrote debug viewer: {index_path}")
     typer.echo(f"Wrote debug data: {data_path}")
