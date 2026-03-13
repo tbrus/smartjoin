@@ -8,14 +8,17 @@ from smartjoin.analysis import analyze_path
 
 def test_health_generator_writes_ground_truth_and_traps(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    out_dir = tmp_path / "health_dataset"
+    output_root = tmp_path
+    out_dir = output_root / "health"
 
     subprocess.run(
         [
             sys.executable,
-            "scripts/generate_smartjoin_health_testdata.py",
-            "--out-dir",
-            str(out_dir),
+            "scripts/test_datasets/run.py",
+            "--domain",
+            "health",
+            "--output-dir",
+            str(output_root),
             "--seed",
             "17",
             "--n-patients",
@@ -68,14 +71,17 @@ def test_health_generator_writes_ground_truth_and_traps(tmp_path: Path) -> None:
 
 def test_health_generator_core_join_recall(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    out_dir = tmp_path / "health_dataset"
+    output_root = tmp_path
+    out_dir = output_root / "health"
 
     subprocess.run(
         [
             sys.executable,
-            "scripts/generate_smartjoin_health_testdata.py",
-            "--out-dir",
-            str(out_dir),
+            "scripts/test_datasets/run.py",
+            "--domain",
+            "health",
+            "--output-dir",
+            str(output_root),
             "--seed",
             "19",
             "--n-patients",

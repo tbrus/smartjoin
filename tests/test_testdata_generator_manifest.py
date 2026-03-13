@@ -9,14 +9,17 @@ from smartjoin.analysis import analyze_path
 
 def test_generator_writes_core_relationship_and_trap_summary(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    out_dir = tmp_path / "generated_dataset"
+    output_root = tmp_path
+    out_dir = output_root / "retail"
 
     subprocess.run(
         [
             sys.executable,
-            "scripts/generate_smartjoin_testdata.py",
-            "--out-dir",
-            str(out_dir),
+            "scripts/test_datasets/run.py",
+            "--domain",
+            "retail",
+            "--output-dir",
+            str(output_root),
             "--seed",
             "7",
             "--n-customers",
@@ -85,14 +88,17 @@ def test_generator_writes_core_relationship_and_trap_summary(tmp_path: Path) -> 
 
 def test_analyze_recovers_core_ground_truth_joins_on_dirty_generated_data(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    out_dir = tmp_path / "generated_dataset"
+    output_root = tmp_path
+    out_dir = output_root / "retail"
 
     subprocess.run(
         [
             sys.executable,
-            "scripts/generate_smartjoin_testdata.py",
-            "--out-dir",
-            str(out_dir),
+            "scripts/test_datasets/run.py",
+            "--domain",
+            "retail",
+            "--output-dir",
+            str(output_root),
             "--seed",
             "11",
             "--n-customers",

@@ -6,15 +6,42 @@ import argparse
 import csv
 import json
 import random
-import string
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-COUNTRIES = ["US", "DE", "PL", "FR", "GB", "ES", "NL", "SE", "IT", "CZ"]
-CURRENCIES = ["USD", "EUR", "PLN", "GBP"]
+from test_datasets.common import (
+    COUNTRIES,
+    CURRENCIES,
+    derive_prefixed_numeric,
+)
+from test_datasets.common import (
+    dirty_key as shared_dirty_key,
+)
+from test_datasets.common import (
+    idf as shared_idf,
+)
+from test_datasets.common import (
+    iso as shared_iso,
+)
+from test_datasets.common import (
+    maybe_missing as shared_maybe_missing,
+)
+from test_datasets.common import (
+    pick as shared_pick,
+)
+from test_datasets.common import (
+    sample_lines as shared_sample_lines,
+)
+from test_datasets.common import (
+    token as shared_token,
+)
+from test_datasets.common import (
+    write_csv as shared_write_csv,
+)
+
 PATIENT_STATUS = ["active", "inactive", "archived"]
 ENCOUNTER_STATUS = ["scheduled", "arrived", "completed", "cancelled", "no_show"]
 CLAIM_STATUS = ["submitted", "review", "approved", "denied", "paid", "voided"]
@@ -38,6 +65,7 @@ class Profile:
 
 
 PROFILES: dict[str, Profile] = {
+    "tiny": Profile("tiny", 800, 120, 40, 20, 2_000, 1_700, 2.2),
     "small": Profile("small", 15_000, 1_200, 300, 120, 70_000, 62_000, 2.7),
     "medium": Profile("medium", 45_000, 4_000, 1_000, 400, 220_000, 190_000, 3.1),
     "large": Profile("large", 120_000, 10_000, 2_500, 1_200, 900_000, 760_000, 3.3),
@@ -59,60 +87,60 @@ class Config:
     pct_missing: float
     pct_duplicates: float
     pct_dirty_keys: float
+    pct_derived_keys: float
+    pct_derived_both_sides: float
     pct_inconsistent_types: float
     include_json: bool
     max_json_encounters: int
 
 
 def idf(prefix: str, value: int, width: int) -> str:
-    return f"{prefix}{value:0{width}d}"
+    return shared_idf(prefix, value, width)
 
 
 def iso(base: date, offset: int) -> str:
-    return (base + timedelta(days=offset)).isoformat()
+    return shared_iso(base, offset)
 
 
 def pick(rng: random.Random, values: list[str], weights: list[int]) -> str:
-    return rng.choices(values, weights=weights, k=1)[0]
+    return shared_pick(rng, values, weights)
 
 
 def maybe_missing(rng: random.Random, value: Any, p: float) -> Any:
-    return "" if rng.random() < p else value
+    return shared_maybe_missing(rng, value, p)
 
 
 def dirty_key(rng: random.Random, value: str) -> str:
-    r = rng.random()
-    if r < 0.33:
-        return f" {value} "
-    if r < 0.66:
-        return value.lower()
-    return value.zfill(len(value) + rng.randint(1, 3))
+    return shared_dirty_key(rng, value)
 
 
 def token(rng: random.Random, n: int) -> str:
-    return "".join(rng.choices(string.ascii_uppercase + string.digits, k=n))
+    return shared_token(rng, n)
 
 
 def write_csv(path: Path, fields: list[str], rows: Iterable[dict[str, Any]]) -> int:
-    count = 0
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
-            count += 1
-    return count
+    return shared_write_csv(path, fields, rows)
 
 
 def sample_lines(rng: random.Random, avg: float) -> int:
-    p_stop = min(0.95, max(0.05, 1.0 / max(avg, 1.0)))
-    count = 1
-    while count < 12 and rng.random() > p_stop:
-        count += 1
-    return count
+    return shared_sample_lines(rng, avg, max_lines=12)
 
 
-def parse_args() -> Config:
+def maybe_derived_id(
+    rng: random.Random,
+    value: str,
+    *,
+    probability: float,
+    prefix_override: str,
+    styles: tuple[str, ...] = ("dash_lower", "underscore_upper", "hash_lower"),
+) -> str:
+    if rng.random() >= probability:
+        return value
+    style = rng.choice(list(styles))
+    return derive_prefixed_numeric(value, style=style, prefix_override=prefix_override)
+
+
+def parse_args(argv: list[str] | None = None) -> Config:
     parser = argparse.ArgumentParser(
         description="Generate deterministic healthcare-style performance data."
     )
@@ -129,10 +157,12 @@ def parse_args() -> Config:
     parser.add_argument("--pct-missing", type=float, default=0.02)
     parser.add_argument("--pct-duplicates", type=float, default=0.01)
     parser.add_argument("--pct-dirty-keys", type=float, default=0.04)
+    parser.add_argument("--pct-derived-keys", type=float, default=0.2)
+    parser.add_argument("--pct-derived-both-sides", type=float, default=0.1)
     parser.add_argument("--pct-inconsistent-types", type=float, default=0.03)
     parser.add_argument("--include-json", action="store_true", default=False)
     parser.add_argument("--max-json-encounters", type=int, default=40_000)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     profile = PROFILES[args.profile]
     out_dir = args.out_dir or (Path("perf_data") / "datasets" / f"health_{args.profile}")
     return Config(
@@ -149,6 +179,8 @@ def parse_args() -> Config:
         pct_missing=args.pct_missing,
         pct_duplicates=args.pct_duplicates,
         pct_dirty_keys=args.pct_dirty_keys,
+        pct_derived_keys=args.pct_derived_keys,
+        pct_derived_both_sides=args.pct_derived_both_sides,
         pct_inconsistent_types=args.pct_inconsistent_types,
         include_json=args.include_json,
         max_json_encounters=args.max_json_encounters,
@@ -250,6 +282,18 @@ def generate_dataset(config: Config) -> dict[str, int]:
             patient = idf("PT", rng.randint(1, config.n_patients), 8)
             provider = idf("PRV", rng.randint(1, config.n_providers), 7)
             facility = idf("FAC", rng.randint(1, config.n_facilities), 6)
+            patient = maybe_derived_id(
+                rng,
+                patient,
+                probability=config.pct_derived_keys,
+                prefix_override="pat",
+            )
+            facility = maybe_derived_id(
+                rng,
+                facility,
+                probability=config.pct_derived_keys * 0.6,
+                prefix_override="facility",
+            )
             if rng.random() < config.pct_dirty_keys:
                 patient = dirty_key(rng, patient)
             if rng.random() < config.pct_dirty_keys * 0.5:
@@ -291,6 +335,18 @@ def generate_dataset(config: Config) -> dict[str, int]:
         for i in range(1, config.n_claims + 1):
             encounter = idf("ENC", rng.randint(1, config.n_encounters), 10)
             payer = idf("PY", rng.randint(1, config.n_payers), 6)
+            encounter = maybe_derived_id(
+                rng,
+                encounter,
+                probability=config.pct_derived_keys,
+                prefix_override="enc",
+            )
+            payer = maybe_derived_id(
+                rng,
+                payer,
+                probability=config.pct_derived_keys * 0.6,
+                prefix_override="payer",
+            )
             if rng.random() < config.pct_dirty_keys:
                 encounter = dirty_key(rng, encounter)
             if rng.random() < config.pct_dirty_keys * 0.6:
@@ -378,12 +434,41 @@ def generate_dataset(config: Config) -> dict[str, int]:
         for i in range(1, config.n_claims + 1):
             if rng.random() < 0.15:
                 continue
-            claim = idf("CLM", i, 10)
+            claim = maybe_derived_id(
+                rng,
+                idf("CLM", i, 10),
+                probability=config.pct_derived_keys,
+                prefix_override="claim",
+            )
             if rng.random() < config.pct_dirty_keys:
                 claim = dirty_key(rng, claim)
             paid = iso(base, rng.randint(0, 1800))
+            payment_id_canonical = idf("PAY", i, 10)
+            payment_id = payment_id_canonical
+            adjustment_payment_key = payment_id_canonical
+            if rng.random() < config.pct_derived_both_sides:
+                payment_id = maybe_derived_id(
+                    rng,
+                    payment_id_canonical,
+                    probability=1.0,
+                    prefix_override="pay",
+                    styles=("dash_lower", "hash_lower"),
+                )
+                adjustment_payment_key = maybe_derived_id(
+                    rng,
+                    payment_id_canonical,
+                    probability=1.0,
+                    prefix_override="payment",
+                    styles=("underscore_upper", "slash_lower", "space_dash"),
+                )
+                if adjustment_payment_key == payment_id:
+                    adjustment_payment_key = derive_prefixed_numeric(
+                        payment_id_canonical,
+                        style="underscore_upper",
+                        prefix_override="payment",
+                    )
             payment = {
-                "payment_id": idf("PAY", i, 10),
+                "payment_id": payment_id,
                 "claim_key_id": claim,
                 "status": pick(rng, PAYMENT_STATUS, [18, 14, 62, 6]),
                 "paid_amount": round(max(5.0, rng.lognormvariate(4.0, 0.75)), 2),
@@ -398,7 +483,7 @@ def generate_dataset(config: Config) -> dict[str, int]:
             if payment["status"] in {"partial", "rejected"} or rng.random() < 0.22:
                 adjustment = {
                     "adjustment_id": idf("ADJ", i, 10),
-                    "payment_id": payment["payment_id"],
+                    "payment_id": adjustment_payment_key,
                     "adjustment_amount": round(max(1.0, rng.lognormvariate(2.2, 0.6)), 2),
                     "reason": rng.choice(ADJUST_REASONS),
                     "status": pick(rng, ["open", "posted"], [35, 65]),
@@ -439,40 +524,114 @@ def write_docs(config: Config, counts: dict[str, int]) -> None:
     config_dict = asdict(config)
     config_dict["out_dir"] = str(config.out_dir)
     core_relationships = [
-        ("encounters", "patient_key_id", "patients", "patient_key", True),
-        ("encounters", "provider_key_id", "providers", "provider_id", False),
-        ("encounters", "facility_key_id", "facilities", "facility_id", True),
-        ("claims", "encounter_id", "encounters", "encounter_id", True),
-        ("claims", "payer_key_id", "payers", "payer_id", True),
-        ("claim_lines", "claim_id", "claims", "claim_id", False),
-        ("payments", "claim_key_id", "claims", "claim_id", True),
-        ("adjustments", "payment_id", "payments", "payment_id", False),
+        {
+            "from_table": "encounters",
+            "from_column": "patient_key_id",
+            "to_table": "patients",
+            "to_column": "patient_key",
+            "relationship": "many_to_one",
+            "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
+        },
+        {
+            "from_table": "encounters",
+            "from_column": "provider_key_id",
+            "to_table": "providers",
+            "to_column": "provider_id",
+            "relationship": "many_to_one",
+            "dirty_keys_present": False,
+            "join_type": "direct",
+        },
+        {
+            "from_table": "encounters",
+            "from_column": "facility_key_id",
+            "to_table": "facilities",
+            "to_column": "facility_id",
+            "relationship": "many_to_one",
+            "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
+        },
+        {
+            "from_table": "claims",
+            "from_column": "encounter_id",
+            "to_table": "encounters",
+            "to_column": "encounter_id",
+            "relationship": "many_to_one",
+            "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
+        },
+        {
+            "from_table": "claims",
+            "from_column": "payer_key_id",
+            "to_table": "payers",
+            "to_column": "payer_id",
+            "relationship": "many_to_one",
+            "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
+        },
+        {
+            "from_table": "claim_lines",
+            "from_column": "claim_id",
+            "to_table": "claims",
+            "to_column": "claim_id",
+            "relationship": "many_to_one",
+            "dirty_keys_present": False,
+            "join_type": "direct",
+        },
+        {
+            "from_table": "payments",
+            "from_column": "claim_key_id",
+            "to_table": "claims",
+            "to_column": "claim_id",
+            "relationship": "many_to_one",
+            "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
+        },
+        {
+            "from_table": "adjustments",
+            "from_column": "payment_id",
+            "to_table": "payments",
+            "to_column": "payment_id",
+            "relationship": "many_to_one",
+            "dirty_keys_present": False,
+            "join_type": "derived_mixed",
+            "derived_side": "both_tables",
+        },
     ]
     if config.include_json:
         core_relationships.append(
-            ("encounters_nested", "patientId", "patients", "patient_key", False)
+            {
+                "from_table": "encounters_nested",
+                "from_column": "patientId",
+                "to_table": "patients",
+                "to_column": "patient_key",
+                "relationship": "many_to_one",
+                "dirty_keys_present": False,
+                "join_type": "direct",
+            }
         )
 
-    expected_joins = [f"{a}.{b} -> {c}.{d}" for a, b, c, d, _ in core_relationships]
+    expected_joins = [
+        (
+            f"{relationship['from_table']}.{relationship['from_column']} -> "
+            f"{relationship['to_table']}.{relationship['to_column']}"
+        )
+        for relationship in core_relationships
+    ]
     manifest = {
-        "generator": "scripts/generate_smartjoin_health_testdata.py",
+        "generator": "scripts/test_datasets/domains/health.py",
         "config": config_dict,
         "row_counts": counts,
         "expected_joins": expected_joins,
         "expected_composite_keys": ["claim_lines(claim_id, line_no) near-unique"],
         "trap_columns": ["status", "country", "currency", "region_code", "encounter_date"],
         "ground_truth": {
-            "core_relationships": [
-                {
-                    "from_table": a,
-                    "from_column": b,
-                    "to_table": c,
-                    "to_column": d,
-                    "relationship": "many_to_one",
-                    "dirty_keys_present": dirty,
-                }
-                for a, b, c, d, dirty in core_relationships
-            ],
+            "core_relationships": core_relationships,
             "composite_key_candidates": [
                 {
                     "table": "claim_lines",
@@ -521,7 +680,7 @@ def write_docs(config: Config, counts: dict[str, int]) -> None:
     lines = [
         "# Smartjoin Healthcare Test Data",
         "",
-        "Generated by `scripts/generate_smartjoin_health_testdata.py`.",
+        "Generated by `scripts/test_datasets/domains/health.py`.",
         f"Profile: `{config.profile}`, Seed: `{config.seed}`",
         "",
         "## Row counts",
@@ -534,6 +693,8 @@ def write_docs(config: Config, counts: dict[str, int]) -> None:
         [
             "",
             "## Trap Signals (Should Not Be Primary Join Keys)",
+            "- blended derived keys are intentionally mixed into join columns",
+            "- includes one-sided and both-sided derived-key relationships",
             "- low-cardinality columns: status, country, currency",
             "- date-like fields reused across tables",
             "- misleading id fields: patient_alt_id / patient_key_id / patientId",
@@ -547,8 +708,8 @@ def write_docs(config: Config, counts: dict[str, int]) -> None:
     (out_dir / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def main() -> None:
-    config = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    config = parse_args(argv)
     counts = generate_dataset(config)
     write_docs(config, counts)
     print(f"Generated dataset at: {config.out_dir.resolve()}")

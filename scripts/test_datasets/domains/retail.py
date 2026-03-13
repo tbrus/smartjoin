@@ -6,15 +6,39 @@ import argparse
 import csv
 import json
 import random
-import string
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-COUNTRIES = ["US", "DE", "PL", "FR", "GB", "ES", "NL", "SE", "IT", "CZ"]
-CURRENCIES = ["USD", "EUR", "PLN", "GBP"]
+from test_datasets.common import (
+    COUNTRIES,
+    CURRENCIES,
+    derive_prefixed_numeric,
+)
+from test_datasets.common import (
+    dirty_key as shared_dirty_key,
+)
+from test_datasets.common import (
+    iso as shared_iso,
+)
+from test_datasets.common import (
+    maybe_missing as shared_maybe_missing,
+)
+from test_datasets.common import (
+    pick as shared_pick,
+)
+from test_datasets.common import (
+    sample_lines as shared_sample_lines,
+)
+from test_datasets.common import (
+    token as shared_token,
+)
+from test_datasets.common import (
+    write_csv as shared_write_csv,
+)
+
 ORDER_STATUSES = ["created", "paid", "shipped", "delivered", "cancelled", "refunded"]
 PAYMENT_STATUSES = ["authorized", "captured", "failed", "refunded", "partial_refund"]
 SHIP_STATUSES = ["label_created", "in_transit", "delivered", "exception"]
@@ -32,6 +56,13 @@ class SizeProfile:
 
 
 PROFILES: dict[str, SizeProfile] = {
+    "tiny": SizeProfile(
+        name="tiny",
+        n_customers=500,
+        n_products=150,
+        n_orders=1_200,
+        avg_items_per_order=2.2,
+    ),
     "small": SizeProfile(
         name="small",
         n_customers=20_000,
@@ -68,6 +99,8 @@ class Config:
     pct_missing: float
     pct_duplicates: float
     pct_dirty_keys: float
+    pct_derived_keys: float
+    pct_derived_both_sides: float
     pct_inconsistent_types: float
     include_json: bool
     max_json_orders: int
@@ -134,6 +167,8 @@ def build_core_relationships(include_json: bool) -> list[dict[str, Any]]:
             "to_column": "customer_id",
             "relationship": "many_to_one",
             "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
         },
         {
             "from_table": "order_items",
@@ -142,6 +177,7 @@ def build_core_relationships(include_json: bool) -> list[dict[str, Any]]:
             "to_column": "order_id",
             "relationship": "many_to_one",
             "dirty_keys_present": False,
+            "join_type": "direct",
         },
         {
             "from_table": "order_items",
@@ -150,6 +186,8 @@ def build_core_relationships(include_json: bool) -> list[dict[str, Any]]:
             "to_column": "product_id",
             "relationship": "many_to_one",
             "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
         },
         {
             "from_table": "payments",
@@ -158,6 +196,8 @@ def build_core_relationships(include_json: bool) -> list[dict[str, Any]]:
             "to_column": "order_id",
             "relationship": "many_to_one",
             "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
         },
         {
             "from_table": "refunds",
@@ -166,6 +206,8 @@ def build_core_relationships(include_json: bool) -> list[dict[str, Any]]:
             "to_column": "payment_id",
             "relationship": "many_to_one",
             "dirty_keys_present": False,
+            "join_type": "derived_mixed",
+            "derived_side": "both_tables",
         },
         {
             "from_table": "shipments",
@@ -174,6 +216,8 @@ def build_core_relationships(include_json: bool) -> list[dict[str, Any]]:
             "to_column": "order_id",
             "relationship": "many_to_one",
             "dirty_keys_present": True,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
         },
         {
             "from_table": "order_promotions",
@@ -182,6 +226,8 @@ def build_core_relationships(include_json: bool) -> list[dict[str, Any]]:
             "to_column": "order_id",
             "relationship": "many_to_one",
             "dirty_keys_present": False,
+            "join_type": "derived_mixed",
+            "derived_side": "from_table_only",
         },
         {
             "from_table": "order_promotions",
@@ -190,6 +236,7 @@ def build_core_relationships(include_json: bool) -> list[dict[str, Any]]:
             "to_column": "promo_code",
             "relationship": "many_to_one",
             "dirty_keys_present": False,
+            "join_type": "direct",
         },
     ]
     if include_json:
@@ -247,7 +294,7 @@ def build_trap_summary(include_json: bool) -> dict[str, Any]:
     }
 
 
-def parse_args() -> Config:
+def parse_args(argv: list[str] | None = None) -> Config:
     """Build generator configuration from CLI args."""
     parser = argparse.ArgumentParser(
         description="Generate deterministic relational test data for Smartjoin."
@@ -262,10 +309,12 @@ def parse_args() -> Config:
     parser.add_argument("--pct-missing", type=float, default=0.02)
     parser.add_argument("--pct-duplicates", type=float, default=0.01)
     parser.add_argument("--pct-dirty-keys", type=float, default=0.04)
+    parser.add_argument("--pct-derived-keys", type=float, default=0.2)
+    parser.add_argument("--pct-derived-both-sides", type=float, default=0.1)
     parser.add_argument("--pct-inconsistent-types", type=float, default=0.03)
     parser.add_argument("--include-json", action="store_true", default=False)
     parser.add_argument("--max-json-orders", type=int, default=40_000)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     profile = PROFILES[args.profile]
     out_dir = args.out_dir or (Path("perf_data") / "datasets" / f"smartjoin_{args.profile}")
@@ -280,6 +329,8 @@ def parse_args() -> Config:
         pct_missing=args.pct_missing,
         pct_duplicates=args.pct_duplicates,
         pct_dirty_keys=args.pct_dirty_keys,
+        pct_derived_keys=args.pct_derived_keys,
+        pct_derived_both_sides=args.pct_derived_both_sides,
         pct_inconsistent_types=args.pct_inconsistent_types,
         include_json=args.include_json,
         max_json_orders=args.max_json_orders,
@@ -298,44 +349,42 @@ def make_order_id(value: int) -> str:
     return f"O{value:09d}"
 
 
+def maybe_derived_id(
+    rng: random.Random,
+    value: str,
+    *,
+    probability: float,
+    prefix_override: str,
+    styles: tuple[str, ...] = ("dash_lower", "underscore_upper", "hash_lower"),
+) -> str:
+    if rng.random() >= probability:
+        return value
+    style = rng.choice(list(styles))
+    return derive_prefixed_numeric(value, style=style, prefix_override=prefix_override)
+
+
 def pick_weighted(rng: random.Random, values: list[str], weights: list[int]) -> str:
-    return rng.choices(values, weights=weights, k=1)[0]
+    return shared_pick(rng, values, weights)
 
 
 def maybe_missing(rng: random.Random, value: Any, probability: float) -> Any:
-    if rng.random() < probability:
-        return ""
-    return value
+    return shared_maybe_missing(rng, value, probability)
 
 
 def dirty_key(rng: random.Random, value: str) -> str:
-    mode = rng.random()
-    if mode < 0.33:
-        return f" {value} "
-    if mode < 0.66:
-        return value.lower()
-    return value.zfill(len(value) + rng.randint(1, 3))
+    return shared_dirty_key(rng, value)
 
 
 def rand_token(rng: random.Random, length: int) -> str:
-    chars = string.ascii_uppercase + string.digits
-    return "".join(rng.choices(chars, k=length))
+    return shared_token(rng, length)
 
 
 def iso_date(base_date: date, offset_days: int) -> str:
-    return (base_date + timedelta(days=offset_days)).isoformat()
+    return shared_iso(base_date, offset_days)
 
 
 def write_csv_rows(path: Path, fieldnames: list[str], rows: Iterable[dict[str, Any]]) -> int:
-    """Write CSV rows and return the number of rows written."""
-    count = 0
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
-            count += 1
-    return count
+    return shared_write_csv(path, fieldnames, rows)
 
 
 def sample_item_count(rng: random.Random, avg_target: float) -> int:
@@ -344,11 +393,7 @@ def sample_item_count(rng: random.Random, avg_target: float) -> int:
 
     A geometric-like process gives long tails and realistic skew.
     """
-    stop_probability = min(0.95, max(0.05, 1.0 / max(avg_target, 1.0)))
-    count = 1
-    while count < 12 and rng.random() > stop_probability:
-        count += 1
-    return count
+    return shared_sample_lines(rng, avg_target, max_lines=12)
 
 
 def generate_dataset(config: Config) -> dict[str, int]:
@@ -464,9 +509,14 @@ def generate_dataset(config: Config) -> dict[str, int]:
     def order_rows() -> Iterable[dict[str, Any]]:
         for i in range(1, config.n_orders + 1):
             customer_id = make_customer_id(rng.randint(1, config.n_customers))
-            customer_id = (
-                dirty_key(rng, customer_id) if rng.random() < config.pct_dirty_keys else customer_id
+            customer_id = maybe_derived_id(
+                rng,
+                customer_id,
+                probability=config.pct_derived_keys,
+                prefix_override="cust",
             )
+            if rng.random() < config.pct_dirty_keys:
+                customer_id = dirty_key(rng, customer_id)
             order_number: Any = i
             if rng.random() < config.pct_inconsistent_types:
                 order_number = str(i)
@@ -508,11 +558,14 @@ def generate_dataset(config: Config) -> dict[str, int]:
             line_count = sample_item_count(rng, config.avg_items_per_order)
             for line_no in range(1, line_count + 1):
                 product_id = make_product_id(rng.randint(1, config.n_products))
-                product_id = (
-                    dirty_key(rng, product_id)
-                    if rng.random() < config.pct_dirty_keys
-                    else product_id
+                product_id = maybe_derived_id(
+                    rng,
+                    product_id,
+                    probability=config.pct_derived_keys * 0.6,
+                    prefix_override="prd",
                 )
+                if rng.random() < config.pct_dirty_keys:
+                    product_id = dirty_key(rng, product_id)
                 row = {
                     "order_id": order_id,
                     "line_no": line_no,
@@ -567,11 +620,38 @@ def generate_dataset(config: Config) -> dict[str, int]:
         for i in range(1, config.n_orders + 1):
             if rng.random() < 0.06:
                 continue
-            order_id = make_order_id(i)
-            order_id = (
-                dirty_key(rng, order_id) if rng.random() < config.pct_dirty_keys else order_id
+            order_id = maybe_derived_id(
+                rng,
+                make_order_id(i),
+                probability=config.pct_derived_keys,
+                prefix_override="ord",
             )
-            payment_id = f"PAY{i:010d}"
+            if rng.random() < config.pct_dirty_keys:
+                order_id = dirty_key(rng, order_id)
+            payment_id_canonical = f"PAY{i:010d}"
+            payment_id = payment_id_canonical
+            refund_payment_key = payment_id_canonical
+            if rng.random() < config.pct_derived_both_sides:
+                payment_id = maybe_derived_id(
+                    rng,
+                    payment_id_canonical,
+                    probability=1.0,
+                    prefix_override="pay",
+                    styles=("dash_lower", "hash_lower"),
+                )
+                refund_payment_key = maybe_derived_id(
+                    rng,
+                    payment_id_canonical,
+                    probability=1.0,
+                    prefix_override="payment",
+                    styles=("underscore_upper", "slash_lower", "space_dash"),
+                )
+                if refund_payment_key == payment_id:
+                    refund_payment_key = derive_prefixed_numeric(
+                        payment_id_canonical,
+                        style="underscore_upper",
+                        prefix_override="payment",
+                    )
             status = pick_weighted(rng, PAYMENT_STATUSES, [10, 70, 5, 10, 5])
             amount = round(max(1.0, rng.lognormvariate(3.2, 0.7)), 2)
             created = iso_date(base_date, rng.randint(0, 1000))
@@ -599,7 +679,7 @@ def generate_dataset(config: Config) -> dict[str, int]:
                 )
                 refund_row = {
                     "refund_id": f"REF{i:010d}",
-                    "payment_key_id": payment_id,
+                    "payment_key_id": refund_payment_key,
                     "refund_amount": refund_amount,
                     "created_date": iso_date(date.fromisoformat(created), rng.randint(0, 60)),
                     "reason": pick_weighted(
@@ -623,10 +703,14 @@ def generate_dataset(config: Config) -> dict[str, int]:
         for i in range(1, n_shipments + 1):
             shipped_date = iso_date(base_date, rng.randint(0, 1000))
             delivered_date = iso_date(date.fromisoformat(shipped_date), rng.randint(1, 12))
-            order_id = make_order_id(rng.randint(1, config.n_orders))
-            order_id = (
-                dirty_key(rng, order_id) if rng.random() < config.pct_dirty_keys else order_id
+            order_id = maybe_derived_id(
+                rng,
+                make_order_id(rng.randint(1, config.n_orders)),
+                probability=config.pct_derived_keys,
+                prefix_override="ord",
             )
+            if rng.random() < config.pct_dirty_keys:
+                order_id = dirty_key(rng, order_id)
             row = {
                 "shipment_id": f"SHP{i:010d}",
                 "order_key_id": order_id,
@@ -689,8 +773,14 @@ def generate_dataset(config: Config) -> dict[str, int]:
     def order_promotion_rows() -> Iterable[dict[str, Any]]:
         n_rows = int(config.n_orders * 0.35)
         for _ in range(n_rows):
+            order_key = maybe_derived_id(
+                rng,
+                make_order_id(rng.randint(1, config.n_orders)),
+                probability=config.pct_derived_keys,
+                prefix_override="ord",
+            )
             row = {
-                "order_key_id": make_order_id(rng.randint(1, config.n_orders)),
+                "order_key_id": order_key,
                 "promo_code": rng.choice(promo_codes),
                 "applied_date": iso_date(base_date, rng.randint(0, 1000)),
             }
@@ -745,7 +835,7 @@ def write_dataset_docs(config: Config, row_counts: dict[str, int]) -> None:
         for relationship in core_relationships
     ]
     manifest = {
-        "generator": "scripts/generate_smartjoin_testdata.py",
+        "generator": "scripts/test_datasets/domains/retail.py",
         "config": config_dict,
         "row_counts": row_counts,
         "expected_joins": expected_join_strings,
@@ -775,7 +865,7 @@ def write_dataset_docs(config: Config, row_counts: dict[str, int]) -> None:
     lines = [
         "# Smartjoin Performance Test Data",
         "",
-        f"Generated by `scripts/generate_smartjoin_testdata.py` with seed `{config.seed}`.",
+        f"Generated by `scripts/test_datasets/domains/retail.py` with seed `{config.seed}`.",
         f"Profile: `{config.profile}`",
         "",
         "## Row counts",
@@ -793,6 +883,8 @@ def write_dataset_docs(config: Config, row_counts: dict[str, int]) -> None:
         [
             "",
             "## Trap Signals (Should Not Be Primary Join Keys)",
+            "- blended derived keys are intentionally mixed into join columns",
+            "- some joins require one-sided normalization and some both-sided normalization",
             "- shared low-cardinality columns: country, status, currency",
             "- date-like columns reused across tables",
             "- misleading names: cust_id / customer_key_id / customerId",
@@ -803,8 +895,8 @@ def write_dataset_docs(config: Config, row_counts: dict[str, int]) -> None:
     (out_dir / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def main() -> None:
-    config = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    config = parse_args(argv)
     row_counts = generate_dataset(config)
     write_dataset_docs(config, row_counts)
     print(f"Generated dataset at: {config.out_dir.resolve()}")

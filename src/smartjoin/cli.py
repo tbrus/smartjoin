@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -50,6 +51,22 @@ def _parse_float_assignments_csv(raw: str | None, label: str) -> dict[str, float
         except ValueError as exc:
             raise typer.BadParameter(f"Invalid numeric {label} value for {key}: {value}") from exc
     return parsed
+
+
+def _load_test_dataset_runner() -> object:
+    """Load scripts/test_datasets/run.py directly to avoid import-path conflicts."""
+    repo_root = Path(__file__).resolve().parents[2]
+    run_path = repo_root / "scripts" / "test_datasets" / "run.py"
+    if not run_path.exists():
+        raise typer.BadParameter(
+            "Test dataset generators are unavailable: scripts/test_datasets/run.py is missing."
+        )
+    spec = importlib.util.spec_from_file_location("smartjoin_test_datasets_run", run_path)
+    if spec is None or spec.loader is None:
+        raise typer.BadParameter(f"Unable to load dataset runner module: {run_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 @app.callback()
@@ -424,6 +441,54 @@ def debug_site_command(
     )
     typer.echo(f"Wrote debug viewer: {index_path}")
     typer.echo(f"Wrote debug data: {data_path}")
+
+
+@app.command(
+    "generate-test-datasets",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def generate_test_datasets_command(
+    ctx: typer.Context,
+    domain: Annotated[
+        Literal["retail", "health", "saas"] | None,
+        typer.Option(
+            "--domain",
+            help="Generate one domain; omit to generate all domains.",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="Root output directory for generated datasets."),
+    ] = Path("test_datasets"),
+    seed: Annotated[
+        int,
+        typer.Option("--seed", help="Deterministic generation seed."),
+    ] = 42,
+    profile: Annotated[
+        Literal["tiny", "small", "medium", "large"],
+        typer.Option("--profile", help="Size profile for generated datasets."),
+    ] = "small",
+    clean: Annotated[
+        bool,
+        typer.Option("--clean", help="Delete target domain output directories first."),
+    ] = False,
+) -> None:
+    """Generate deterministic test datasets."""
+    datasets_run = _load_test_dataset_runner()
+    argv = [
+        "--output-dir",
+        str(output_dir),
+        "--seed",
+        str(seed),
+        "--profile",
+        profile,
+    ]
+    if domain:
+        argv.extend(["--domain", domain])
+    if clean:
+        argv.append("--clean")
+    argv.extend(ctx.args)
+    datasets_run.main(argv)
 
 
 def main() -> None:

@@ -14,3 +14,6 @@ perf_data/
 perf_outputs/
 html/
 .smartjoin_debug/
+/test_datasets/
+!/scripts/test_datasets/
+!/scripts/test_datasets/**
