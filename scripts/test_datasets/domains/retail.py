@@ -16,27 +16,13 @@ from test_datasets.common import (
     COUNTRIES,
     CURRENCIES,
     derive_prefixed_numeric,
-)
-from test_datasets.common import (
-    dirty_key as shared_dirty_key,
-)
-from test_datasets.common import (
-    iso as shared_iso,
-)
-from test_datasets.common import (
-    maybe_missing as shared_maybe_missing,
-)
-from test_datasets.common import (
-    pick as shared_pick,
-)
-from test_datasets.common import (
-    sample_lines as shared_sample_lines,
-)
-from test_datasets.common import (
-    token as shared_token,
-)
-from test_datasets.common import (
-    write_csv as shared_write_csv,
+    dirty_key,
+    iso as iso_date,
+    maybe_missing,
+    pick as pick_weighted,
+    sample_lines as sample_item_count,
+    token as rand_token,
+    write_csv as write_csv_rows,
 )
 
 ORDER_STATUSES = ["created", "paid", "shipped", "delivered", "cancelled", "refunded"]
@@ -361,39 +347,6 @@ def maybe_derived_id(
         return value
     style = rng.choice(list(styles))
     return derive_prefixed_numeric(value, style=style, prefix_override=prefix_override)
-
-
-def pick_weighted(rng: random.Random, values: list[str], weights: list[int]) -> str:
-    return shared_pick(rng, values, weights)
-
-
-def maybe_missing(rng: random.Random, value: Any, probability: float) -> Any:
-    return shared_maybe_missing(rng, value, probability)
-
-
-def dirty_key(rng: random.Random, value: str) -> str:
-    return shared_dirty_key(rng, value)
-
-
-def rand_token(rng: random.Random, length: int) -> str:
-    return shared_token(rng, length)
-
-
-def iso_date(base_date: date, offset_days: int) -> str:
-    return shared_iso(base_date, offset_days)
-
-
-def write_csv_rows(path: Path, fieldnames: list[str], rows: Iterable[dict[str, Any]]) -> int:
-    return shared_write_csv(path, fieldnames, rows)
-
-
-def sample_item_count(rng: random.Random, avg_target: float) -> int:
-    """
-    Sample a bounded line-item count with average near `avg_target`.
-
-    A geometric-like process gives long tails and realistic skew.
-    """
-    return shared_sample_lines(rng, avg_target, max_lines=12)
 
 
 def generate_dataset(config: Config) -> dict[str, int]:

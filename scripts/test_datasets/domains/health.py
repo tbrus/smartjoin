@@ -16,30 +16,13 @@ from test_datasets.common import (
     COUNTRIES,
     CURRENCIES,
     derive_prefixed_numeric,
-)
-from test_datasets.common import (
-    dirty_key as shared_dirty_key,
-)
-from test_datasets.common import (
-    idf as shared_idf,
-)
-from test_datasets.common import (
-    iso as shared_iso,
-)
-from test_datasets.common import (
-    maybe_missing as shared_maybe_missing,
-)
-from test_datasets.common import (
-    pick as shared_pick,
-)
-from test_datasets.common import (
-    sample_lines as shared_sample_lines,
-)
-from test_datasets.common import (
-    token as shared_token,
-)
-from test_datasets.common import (
-    write_csv as shared_write_csv,
+    dirty_key,
+    idf,
+    iso,
+    pick,
+    sample_lines,
+    token,
+    write_csv,
 )
 
 PATIENT_STATUS = ["active", "inactive", "archived"]
@@ -92,38 +75,6 @@ class Config:
     pct_inconsistent_types: float
     include_json: bool
     max_json_encounters: int
-
-
-def idf(prefix: str, value: int, width: int) -> str:
-    return shared_idf(prefix, value, width)
-
-
-def iso(base: date, offset: int) -> str:
-    return shared_iso(base, offset)
-
-
-def pick(rng: random.Random, values: list[str], weights: list[int]) -> str:
-    return shared_pick(rng, values, weights)
-
-
-def maybe_missing(rng: random.Random, value: Any, p: float) -> Any:
-    return shared_maybe_missing(rng, value, p)
-
-
-def dirty_key(rng: random.Random, value: str) -> str:
-    return shared_dirty_key(rng, value)
-
-
-def token(rng: random.Random, n: int) -> str:
-    return shared_token(rng, n)
-
-
-def write_csv(path: Path, fields: list[str], rows: Iterable[dict[str, Any]]) -> int:
-    return shared_write_csv(path, fields, rows)
-
-
-def sample_lines(rng: random.Random, avg: float) -> int:
-    return shared_sample_lines(rng, avg, max_lines=12)
 
 
 def maybe_derived_id(
