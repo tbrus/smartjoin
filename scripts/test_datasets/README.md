@@ -9,6 +9,7 @@ This folder contains generation-only dataset builders used for Smartjoin testing
 - `domains/retail.py`: retail/order-centric generator
 - `domains/health.py`: healthcare claims/encounters generator
 - `domains/saas.py`: SaaS billing/events generator
+- `domains/derived.py`: focused derived-key regression scenarios
 
 ## Quick Start
 
@@ -16,10 +17,12 @@ This folder contains generation-only dataset builders used for Smartjoin testing
 python scripts/test_datasets/run.py --output-dir test_datasets
 python scripts/test_datasets/run.py --pct-derived-keys 0.5 --pct-derived-both-sides 0.25 --output-dir test_datasets
 python scripts/test_datasets/run.py --domain retail --output-dir test_datasets
+python scripts/test_datasets/run.py --domain derived --output-dir test_datasets
 python scripts/test_datasets/run.py --domain saas --seed 42 --output-dir test_datasets
 smartjoin generate-test-datasets --output-dir test_datasets
 smartjoin generate-test-datasets --pct-derived-keys 0.5 --pct-derived-both-sides 0.25 --output-dir test_datasets
 smartjoin generate-test-datasets --domain retail --output-dir test_datasets
+smartjoin generate-test-datasets --domain derived --output-dir test_datasets
 ```
 
 Outputs are written under `<output-dir>/<domain>/`.

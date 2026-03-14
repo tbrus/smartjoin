@@ -450,7 +450,7 @@ def debug_site_command(
 def generate_test_datasets_command(
     ctx: typer.Context,
     domain: Annotated[
-        Literal["retail", "health", "saas"] | None,
+        Literal["retail", "health", "saas", "derived"] | None,
         typer.Option(
             "--domain",
             help="Generate one domain; omit to generate all domains.",

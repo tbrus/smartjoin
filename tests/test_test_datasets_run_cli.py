@@ -81,12 +81,13 @@ def test_run_cli_all_domains_with_tiny_profile(tmp_path: Path) -> None:
     assert (output_root / "retail" / "manifest.json").exists()
     assert (output_root / "health" / "manifest.json").exists()
     assert (output_root / "saas" / "manifest.json").exists()
+    assert (output_root / "derived" / "manifest.json").exists()
 
     generation_manifest = json.loads(
         (output_root / "generation_manifest.json").read_text(encoding="utf-8")
     )
     generated_domains = [item["domain"] for item in generation_manifest["domains"]]
-    assert generated_domains == ["retail", "health", "saas"]
+    assert generated_domains == ["retail", "health", "saas", "derived"]
     assert generation_manifest["pct_missing"] == 0.03
     assert generation_manifest["pct_duplicates"] == 0.02
     assert generation_manifest["pct_dirty_keys"] == 0.07
@@ -96,7 +97,7 @@ def test_run_cli_all_domains_with_tiny_profile(tmp_path: Path) -> None:
     assert generation_manifest["include_json"] is True
     assert generation_manifest["max_json_records"] == 123
 
-    for domain in ["retail", "health", "saas"]:
+    for domain in ["retail", "health", "saas", "derived"]:
         manifest = json.loads((output_root / domain / "manifest.json").read_text(encoding="utf-8"))
         assert manifest["config"]["pct_missing"] == 0.03
         assert manifest["config"]["pct_duplicates"] == 0.02
@@ -105,3 +106,42 @@ def test_run_cli_all_domains_with_tiny_profile(tmp_path: Path) -> None:
         assert manifest["config"]["pct_derived_both_sides"] == 0.25
         assert manifest["config"]["pct_inconsistent_types"] == 0.05
         assert manifest["config"]["include_json"] is True
+
+
+def test_run_cli_derived_domain(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    output_root = tmp_path / "datasets"
+
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/test_datasets/run.py",
+            "--domain",
+            "derived",
+            "--output-dir",
+            str(output_root),
+            "--profile",
+            "tiny",
+            "--seed",
+            "5",
+        ],
+        check=True,
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+
+    derived_dir = output_root / "derived"
+    assert (derived_dir / "manifest.json").exists()
+    assert (derived_dir / "README.md").exists()
+
+    manifest = json.loads((derived_dir / "manifest.json").read_text(encoding="utf-8"))
+    case_names = {item["name"] for item in manifest["ground_truth"]["regression_cases"]}
+    assert {
+        "prefix_swap",
+        "strip_non_alnum",
+        "remove_prefix_numeric",
+        "ambiguous_collision_guard",
+        "date_like_guard",
+        "wide_budget_stress",
+    }.issubset(case_names)

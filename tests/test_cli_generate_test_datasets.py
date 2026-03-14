@@ -107,7 +107,7 @@ def test_cli_generate_test_datasets_all_domains_with_derived_flags(tmp_path: Pat
         (output_root / "generation_manifest.json").read_text(encoding="utf-8")
     )
     generated_domains = [item["domain"] for item in generation_manifest["domains"]]
-    assert generated_domains == ["retail", "health", "saas"]
+    assert generated_domains == ["retail", "health", "saas", "derived"]
     assert generation_manifest["pct_missing"] == 0.03
     assert generation_manifest["pct_duplicates"] == 0.02
     assert generation_manifest["pct_dirty_keys"] == 0.07
@@ -126,4 +126,47 @@ def test_cli_generate_test_datasets_all_domains_with_derived_flags(tmp_path: Pat
         assert manifest["config"]["pct_derived_both_sides"] == 0.25
         assert manifest["config"]["pct_inconsistent_types"] == 0.05
         assert manifest["config"]["include_json"] is True
+
+
+def test_cli_generate_test_datasets_derived_domain(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    output_root = tmp_path / "datasets"
+
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        str(repo_root / "src")
+        if not existing_pythonpath
+        else f"{repo_root / 'src'}{os.pathsep}{existing_pythonpath}"
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "smartjoin.cli",
+            "generate-test-datasets",
+            "--domain",
+            "derived",
+            "--output-dir",
+            str(output_root),
+            "--seed",
+            "17",
+            "--profile",
+            "tiny",
+        ],
+        check=True,
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    derived_dir = output_root / "derived"
+    assert (derived_dir / "manifest.json").exists()
+    generation_manifest = json.loads(
+        (output_root / "generation_manifest.json").read_text(encoding="utf-8")
+    )
+    generated_domains = [item["domain"] for item in generation_manifest["domains"]]
+    assert generated_domains == ["derived"]
 

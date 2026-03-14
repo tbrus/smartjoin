@@ -1,5 +1,5 @@
 """Domain-specific dataset generators."""
 
-from . import health, retail, saas
+from . import derived, health, retail, saas
 
-__all__ = ["retail", "health", "saas"]
+__all__ = ["retail", "health", "saas", "derived"]

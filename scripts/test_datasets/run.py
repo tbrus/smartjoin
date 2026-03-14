@@ -12,9 +12,10 @@ if __package__ in {None, ""}:
     # Allow `python scripts/test_datasets/run.py` to import `test_datasets.*`.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from test_datasets.domains import health, retail, saas
+from test_datasets.domains import derived, health, retail, saas
 
-DOMAIN_ORDER = ("retail", "health", "saas")
+DOMAIN_ORDER = ("retail", "health", "saas", "derived")
+DOMAIN_CHOICES = DOMAIN_ORDER
 PROFILE_CHOICES = ("tiny", "small", "medium", "large")
 
 
@@ -26,6 +27,7 @@ def parse_args(argv: list[str] | None = None) -> tuple[argparse.Namespace, list[
             "Examples:\n"
             "  python scripts/test_datasets/run.py --output-dir test_datasets\n"
             "  python scripts/test_datasets/run.py --domain retail --profile tiny --output-dir test_datasets\n"
+            "  python scripts/test_datasets/run.py --domain derived --output-dir test_datasets\n"
             "  python scripts/test_datasets/run.py --pct-derived-keys 0.5 --output-dir test_datasets\n"
             "  python scripts/test_datasets/run.py --domain saas --n-invoices 2000 --output-dir test_datasets"
         ),
@@ -34,7 +36,7 @@ def parse_args(argv: list[str] | None = None) -> tuple[argparse.Namespace, list[
     selection = parser.add_argument_group("Selection")
     selection.add_argument(
         "--domain",
-        choices=DOMAIN_ORDER,
+        choices=DOMAIN_CHOICES,
         default=None,
         help="Generate only one domain. If omitted, generate all domains.",
     )
@@ -151,6 +153,8 @@ def _run_domain(
         health.main(domain_args)
     elif domain == "saas":
         saas.main(domain_args)
+    elif domain == "derived":
+        derived.main(domain_args)
     else:
         raise ValueError(f"Unsupported domain: {domain}")
 
