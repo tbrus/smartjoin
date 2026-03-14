@@ -25,7 +25,7 @@ smartjoin generate-test-datasets --domain retail --output-dir test_datasets
 smartjoin generate-test-datasets --domain derived --output-dir test_datasets
 ```
 
-Outputs are written under `<output-dir>/<domain>/`.
+Outputs are written under `<output-dir>/<domain>/`, including `manifest.json` and generated input files.
 
 ## Explicit Common Flags
 
@@ -40,7 +40,7 @@ Outputs are written under `<output-dir>/<domain>/`.
 These common flags work with both:
 
 - all domains (omit `--domain`)
-- one selected domain (`--domain retail|health|saas`)
+- one selected domain (`--domain retail|health|saas|derived`)
 
 Domain-specific size overrides are still supported by forwarding unknown flags when `--domain` is set.
 
@@ -54,4 +54,22 @@ python scripts/test_datasets/run.py --domain retail --profile tiny --n-orders 50
 
 - Generation only: no Smartjoin analysis, evaluation scoring, or debug site output.
 - Deterministic behavior is preserved via explicit seeds.
-- Each domain writes `manifest.json` and `README.md` where relevant.
+- Each domain writes `manifest.json`.
+- Legacy per-domain `README.md` files are removed on generation.
+- Manifest creation is centralized in `common/manifest.py` to avoid per-domain duplication.
+
+## Manifest Schema
+
+All domain manifests now share the same top-level shape:
+
+- `generator`, `config`, `row_counts`
+- `expected_joins`
+- `trap_columns`
+- `ground_truth`
+
+`ground_truth` includes a normalized key set across domains:
+
+- `core_tables`, `core_relationships`, `composite_key_candidates`, `traps`
+- `guard_expectations`, `regression_cases`
+
+Some fields are intentionally empty in domains where they do not apply.

@@ -80,11 +80,6 @@ def test_generator_writes_core_relationship_and_trap_summary(tmp_path: Path) -> 
 
     assert len(customers_regions & products_regions) > 0
 
-    readme = (out_dir / "README.md").read_text(encoding="utf-8")
-    assert "## Core True Relationships" in readme
-    assert "## Trap Signals (Should Not Be Primary Join Keys)" in readme
-    assert "region_code" in readme
-
 
 def test_analyze_recovers_core_ground_truth_joins_on_dirty_generated_data(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]

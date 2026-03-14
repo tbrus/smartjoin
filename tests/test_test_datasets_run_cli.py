@@ -35,7 +35,6 @@ def test_run_cli_single_domain_with_passthrough_args(tmp_path: Path) -> None:
 
     retail_dir = output_root / "retail"
     assert (retail_dir / "manifest.json").exists()
-    assert (retail_dir / "README.md").exists()
 
     manifest = json.loads((retail_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["row_counts"]["customers"] > 0
@@ -99,6 +98,22 @@ def test_run_cli_all_domains_with_tiny_profile(tmp_path: Path) -> None:
 
     for domain in ["retail", "health", "saas", "derived"]:
         manifest = json.loads((output_root / domain / "manifest.json").read_text(encoding="utf-8"))
+        assert {
+            "generator",
+            "config",
+            "row_counts",
+            "expected_joins",
+            "trap_columns",
+            "ground_truth",
+        }.issubset(manifest.keys())
+        assert {
+            "core_tables",
+            "core_relationships",
+            "composite_key_candidates",
+            "traps",
+            "guard_expectations",
+            "regression_cases",
+        }.issubset(manifest["ground_truth"].keys())
         assert manifest["config"]["pct_missing"] == 0.03
         assert manifest["config"]["pct_duplicates"] == 0.02
         assert manifest["config"]["pct_dirty_keys"] == 0.07
@@ -133,7 +148,6 @@ def test_run_cli_derived_domain(tmp_path: Path) -> None:
 
     derived_dir = output_root / "derived"
     assert (derived_dir / "manifest.json").exists()
-    assert (derived_dir / "README.md").exists()
 
     manifest = json.loads((derived_dir / "manifest.json").read_text(encoding="utf-8"))
     case_names = {item["name"] for item in manifest["ground_truth"]["regression_cases"]}

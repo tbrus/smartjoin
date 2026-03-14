@@ -13,12 +13,15 @@ from .helpers import (
     token,
     write_csv,
 )
+from .manifest import build_manifest, expected_joins_from_relationships, write_manifest
 
 __all__ = [
     "COUNTRIES",
     "CURRENCIES",
+    "build_manifest",
     "derive_prefixed_numeric",
     "dirty_key",
+    "expected_joins_from_relationships",
     "idf",
     "iso",
     "maybe_missing",
@@ -27,4 +30,5 @@ __all__ = [
     "split_prefixed_numeric",
     "token",
     "write_csv",
+    "write_manifest",
 ]

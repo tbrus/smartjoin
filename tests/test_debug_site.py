@@ -64,7 +64,6 @@ def test_build_debug_site_includes_manifest_when_available(tmp_path: Path) -> No
         json.dumps(
             {
                 "expected_joins": ["orders.customer_id -> customers.customer_id"],
-                "expected_composite_keys": ["orders(order_id)"],
                 "trap_columns": ["country"],
                 "ground_truth": {
                     "core_relationships": [

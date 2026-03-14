@@ -17,3 +17,10 @@ html/
 /test_datasets/
 !/scripts/test_datasets/
 !/scripts/test_datasets/**
+
+# Keep generated Python bytecode/cache ignored inside re-included script tree
+/scripts/test_datasets/**/__pycache__/
+/scripts/test_datasets/**/*.py[cod]
+
+# Local helper not meant for VCS
+/scripts/test_datasets/common/manifest.py
