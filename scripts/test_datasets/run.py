@@ -15,43 +15,112 @@ if __package__ in {None, ""}:
 from test_datasets.domains import health, retail, saas
 
 DOMAIN_ORDER = ("retail", "health", "saas")
+PROFILE_CHOICES = ("tiny", "small", "medium", "large")
 
 
 def parse_args(argv: list[str] | None = None) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(
-        description="Generate deterministic Smartjoin test datasets by domain."
+        description="Generate deterministic Smartjoin test datasets (generation only).",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  python scripts/test_datasets/run.py --output-dir test_datasets\n"
+            "  python scripts/test_datasets/run.py --domain retail --profile tiny --output-dir test_datasets\n"
+            "  python scripts/test_datasets/run.py --pct-derived-keys 0.5 --output-dir test_datasets\n"
+            "  python scripts/test_datasets/run.py --domain saas --n-invoices 2000 --output-dir test_datasets"
+        ),
     )
-    parser.add_argument(
+
+    selection = parser.add_argument_group("Selection")
+    selection.add_argument(
         "--domain",
         choices=DOMAIN_ORDER,
         default=None,
         help="Generate only one domain. If omitted, generate all domains.",
     )
-    parser.add_argument(
+    selection.add_argument(
         "--output-dir",
         type=Path,
         default=Path("test_datasets"),
         help="Root output directory. Domain datasets are written under this root.",
     )
-    parser.add_argument("--seed", type=int, default=42, help="Deterministic seed.")
-    parser.add_argument(
+    selection.add_argument("--seed", type=int, default=42, help="Deterministic seed.")
+    selection.add_argument(
         "--profile",
-        choices=["tiny", "small", "medium", "large"],
+        choices=PROFILE_CHOICES,
         default="small",
         help="Size profile forwarded to domain generators.",
     )
-    parser.add_argument(
+
+    quality = parser.add_argument_group("Data Quality And Key Noise")
+    quality.add_argument("--pct-missing", type=float, default=0.02)
+    quality.add_argument("--pct-duplicates", type=float, default=0.01)
+    quality.add_argument("--pct-dirty-keys", type=float, default=0.04)
+    quality.add_argument(
+        "--pct-derived-keys",
+        type=float,
+        default=0.2,
+        help="Share of derived-key noise applied on one-sided relationships.",
+    )
+    quality.add_argument(
+        "--pct-derived-both-sides",
+        type=float,
+        default=0.1,
+        help="Share of both-sided derived-key relationships to perturb.",
+    )
+    quality.add_argument("--pct-inconsistent-types", type=float, default=0.03)
+
+    json_group = parser.add_argument_group("JSON Output")
+    json_group.add_argument(
+        "--include-json",
+        action="store_true",
+        help="Generate optional nested JSON files for each selected domain.",
+    )
+    json_group.add_argument(
+        "--max-json-records",
+        type=int,
+        default=None,
+        help="Domain-agnostic cap for generated JSON rows (mapped per domain).",
+    )
+
+    execution = parser.add_argument_group("Execution")
+    execution.add_argument(
         "--clean",
         action="store_true",
         help="Delete domain output folders before generation.",
     )
+
     return parser.parse_known_args(argv)
+
+
+def _build_common_args(args: argparse.Namespace) -> list[str]:
+    forwarded = [
+        "--profile",
+        args.profile,
+        "--pct-missing",
+        str(args.pct_missing),
+        "--pct-duplicates",
+        str(args.pct_duplicates),
+        "--pct-dirty-keys",
+        str(args.pct_dirty_keys),
+        "--pct-derived-keys",
+        str(args.pct_derived_keys),
+        "--pct-derived-both-sides",
+        str(args.pct_derived_both_sides),
+        "--pct-inconsistent-types",
+        str(args.pct_inconsistent_types),
+    ]
+    if args.include_json:
+        forwarded.append("--include-json")
+    return forwarded
 
 
 def _run_domain(
     domain: str,
     output_root: Path,
     seed: int,
+    common_args: list[str],
+    max_json_records: int | None,
     clean: bool,
     passthrough: list[str],
 ) -> Path:
@@ -60,12 +129,28 @@ def _run_domain(
         shutil.rmtree(domain_out)
     domain_out.parent.mkdir(parents=True, exist_ok=True)
 
+    domain_args = [
+        *common_args,
+        *passthrough,
+        "--out-dir",
+        str(domain_out),
+        "--seed",
+        str(seed),
+    ]
+    if max_json_records is not None:
+        if domain == "retail":
+            domain_args.extend(["--max-json-orders", str(max_json_records)])
+        elif domain == "health":
+            domain_args.extend(["--max-json-encounters", str(max_json_records)])
+        elif domain == "saas":
+            domain_args.extend(["--max-json-events", str(max_json_records)])
+
     if domain == "retail":
-        retail.main([*passthrough, "--out-dir", str(domain_out), "--seed", str(seed)])
+        retail.main(domain_args)
     elif domain == "health":
-        health.main([*passthrough, "--out-dir", str(domain_out), "--seed", str(seed)])
+        health.main(domain_args)
     elif domain == "saas":
-        saas.main([*passthrough, "--out-dir", str(domain_out), "--seed", str(seed)])
+        saas.main(domain_args)
     else:
         raise ValueError(f"Unsupported domain: {domain}")
 
@@ -79,8 +164,14 @@ def main(argv: list[str] | None = None) -> None:
 
     domains = [args.domain] if args.domain else list(DOMAIN_ORDER)
     if passthrough and not args.domain:
-        raise SystemExit("Domain-specific flags require --domain.")
-    forwarded_passthrough = [*passthrough, "--profile", args.profile]
+        unknown = " ".join(passthrough)
+        raise SystemExit(
+            "Unknown/domain-specific options require --domain.\n"
+            f"Received: {unknown}\n"
+            "Use --help to see explicit common flags in run.py."
+        )
+
+    common_args = _build_common_args(args)
 
     generated = []
     for domain in domains:
@@ -88,14 +179,25 @@ def main(argv: list[str] | None = None) -> None:
             domain=domain,
             output_root=output_root,
             seed=args.seed,
+            common_args=common_args,
+            max_json_records=args.max_json_records,
             clean=bool(args.clean),
-            passthrough=forwarded_passthrough,
+            passthrough=passthrough,
         )
         generated.append({"domain": domain, "output_dir": str(out_dir)})
 
     summary = {
         "generator": "scripts/test_datasets/run.py",
         "seed": args.seed,
+        "profile": args.profile,
+        "pct_missing": args.pct_missing,
+        "pct_duplicates": args.pct_duplicates,
+        "pct_dirty_keys": args.pct_dirty_keys,
+        "pct_derived_keys": args.pct_derived_keys,
+        "pct_derived_both_sides": args.pct_derived_both_sides,
+        "pct_inconsistent_types": args.pct_inconsistent_types,
+        "include_json": bool(args.include_json),
+        "max_json_records": args.max_json_records,
         "output_dir": str(output_root),
         "domains": generated,
     }

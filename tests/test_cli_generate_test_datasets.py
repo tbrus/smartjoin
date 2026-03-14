@@ -55,3 +55,75 @@ def test_cli_generate_test_datasets_command(tmp_path: Path) -> None:
     generated_domains = [item["domain"] for item in generation_manifest["domains"]]
     assert generated_domains == ["retail"]
 
+
+def test_cli_generate_test_datasets_all_domains_with_derived_flags(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    output_root = tmp_path / "datasets"
+
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        str(repo_root / "src")
+        if not existing_pythonpath
+        else f"{repo_root / 'src'}{os.pathsep}{existing_pythonpath}"
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "smartjoin.cli",
+            "generate-test-datasets",
+            "--output-dir",
+            str(output_root),
+            "--seed",
+            "13",
+            "--profile",
+            "tiny",
+            "--pct-missing",
+            "0.03",
+            "--pct-duplicates",
+            "0.02",
+            "--pct-dirty-keys",
+            "0.07",
+            "--pct-derived-keys",
+            "0.5",
+            "--pct-derived-both-sides",
+            "0.25",
+            "--pct-inconsistent-types",
+            "0.05",
+            "--include-json",
+            "--max-json-records",
+            "123",
+        ],
+        check=True,
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    generation_manifest = json.loads(
+        (output_root / "generation_manifest.json").read_text(encoding="utf-8")
+    )
+    generated_domains = [item["domain"] for item in generation_manifest["domains"]]
+    assert generated_domains == ["retail", "health", "saas"]
+    assert generation_manifest["pct_missing"] == 0.03
+    assert generation_manifest["pct_duplicates"] == 0.02
+    assert generation_manifest["pct_dirty_keys"] == 0.07
+    assert generation_manifest["pct_derived_keys"] == 0.5
+    assert generation_manifest["pct_derived_both_sides"] == 0.25
+    assert generation_manifest["pct_inconsistent_types"] == 0.05
+    assert generation_manifest["include_json"] is True
+    assert generation_manifest["max_json_records"] == 123
+
+    for domain in generated_domains:
+        manifest = json.loads((output_root / domain / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["config"]["pct_missing"] == 0.03
+        assert manifest["config"]["pct_duplicates"] == 0.02
+        assert manifest["config"]["pct_dirty_keys"] == 0.07
+        assert manifest["config"]["pct_derived_keys"] == 0.5
+        assert manifest["config"]["pct_derived_both_sides"] == 0.25
+        assert manifest["config"]["pct_inconsistent_types"] == 0.05
+        assert manifest["config"]["include_json"] is True
+

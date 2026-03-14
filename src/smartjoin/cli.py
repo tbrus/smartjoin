@@ -468,6 +468,52 @@ def generate_test_datasets_command(
         Literal["tiny", "small", "medium", "large"],
         typer.Option("--profile", help="Size profile for generated datasets."),
     ] = "small",
+    pct_derived_keys: Annotated[
+        float,
+        typer.Option(
+            "--pct-derived-keys",
+            min=0.0,
+            max=1.0,
+            help="Share of one-sided derived-key perturbations.",
+        ),
+    ] = 0.2,
+    pct_derived_both_sides: Annotated[
+        float,
+        typer.Option(
+            "--pct-derived-both-sides",
+            min=0.0,
+            max=1.0,
+            help="Share of both-sided derived-key perturbations.",
+        ),
+    ] = 0.1,
+    pct_missing: Annotated[
+        float,
+        typer.Option(min=0.0, max=1.0, help="Share of missing values injected."),
+    ] = 0.02,
+    pct_duplicates: Annotated[
+        float,
+        typer.Option(min=0.0, max=1.0, help="Share of duplicate rows injected."),
+    ] = 0.01,
+    pct_dirty_keys: Annotated[
+        float,
+        typer.Option(min=0.0, max=1.0, help="Share of dirty key formatting noise."),
+    ] = 0.04,
+    pct_inconsistent_types: Annotated[
+        float,
+        typer.Option(min=0.0, max=1.0, help="Share of inconsistent type encodings."),
+    ] = 0.03,
+    include_json: Annotated[
+        bool,
+        typer.Option("--include-json", help="Generate optional nested JSON files."),
+    ] = False,
+    max_json_records: Annotated[
+        int | None,
+        typer.Option(
+            "--max-json-records",
+            min=1,
+            help="Cap for JSON rows generated in each domain.",
+        ),
+    ] = None,
     clean: Annotated[
         bool,
         typer.Option("--clean", help="Delete target domain output directories first."),
@@ -482,7 +528,23 @@ def generate_test_datasets_command(
         str(seed),
         "--profile",
         profile,
+        "--pct-missing",
+        str(pct_missing),
+        "--pct-duplicates",
+        str(pct_duplicates),
+        "--pct-dirty-keys",
+        str(pct_dirty_keys),
+        "--pct-derived-keys",
+        str(pct_derived_keys),
+        "--pct-derived-both-sides",
+        str(pct_derived_both_sides),
+        "--pct-inconsistent-types",
+        str(pct_inconsistent_types),
     ]
+    if include_json:
+        argv.append("--include-json")
+    if max_json_records is not None:
+        argv.extend(["--max-json-records", str(max_json_records)])
     if domain:
         argv.extend(["--domain", domain])
     if clean:

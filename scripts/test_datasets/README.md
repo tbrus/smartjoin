@@ -14,29 +14,38 @@ This folder contains generation-only dataset builders used for Smartjoin testing
 
 ```bash
 python scripts/test_datasets/run.py --output-dir test_datasets
+python scripts/test_datasets/run.py --pct-derived-keys 0.5 --pct-derived-both-sides 0.25 --output-dir test_datasets
 python scripts/test_datasets/run.py --domain retail --output-dir test_datasets
 python scripts/test_datasets/run.py --domain saas --seed 42 --output-dir test_datasets
 smartjoin generate-test-datasets --output-dir test_datasets
+smartjoin generate-test-datasets --pct-derived-keys 0.5 --pct-derived-both-sides 0.25 --output-dir test_datasets
 smartjoin generate-test-datasets --domain retail --output-dir test_datasets
 ```
 
 Outputs are written under `<output-dir>/<domain>/`.
 
-## Domain-Specific Flags
+## Explicit Common Flags
 
-`run.py` supports domain-specific flags by forwarding unknown arguments to the selected domain
-generator. This only works with `--domain`.
+`run.py` now exposes common generation flags directly:
+
+- `--profile`, `--seed`, `--clean`
+- `--pct-missing`, `--pct-duplicates`, `--pct-dirty-keys`
+- `--pct-derived-keys`, `--pct-derived-both-sides`
+- `--pct-inconsistent-types`
+- `--include-json`, `--max-json-records`
+
+These common flags work with both:
+
+- all domains (omit `--domain`)
+- one selected domain (`--domain retail|health|saas`)
+
+Domain-specific size overrides are still supported by forwarding unknown flags when `--domain` is set.
 
 Example:
 
 ```bash
 python scripts/test_datasets/run.py --domain retail --profile tiny --n-orders 500 --output-dir test_datasets
 ```
-
-Common derived-key mixing flags:
-
-- `--pct-derived-keys` (default: `0.2`): fraction of join-key values emitted in derived form on one side
-- `--pct-derived-both-sides` (default: `0.1`): fraction of selected relationships emitted in different derived forms on both sides
 
 ## Notes
 
