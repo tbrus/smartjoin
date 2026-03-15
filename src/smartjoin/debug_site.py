@@ -254,29 +254,29 @@ DEBUG_SITE_HTML = """<!doctype html>
   <title>Smartjoin Debug Viewer</title>
   <style>
     :root{
-      --bg:#edf3f9;
-      --bg-2:#f8f1e8;
-      --surface:rgba(255,255,255,0.8);
-      --surface-strong:#ffffff;
-      --surface-soft:#f7fafc;
-      --ink:#10212d;
-      --muted:#5d7081;
-      --edge:#da8a42;
-      --edge-found:#1f9a63;
-      --edge-missing:#d44958;
-      --edge-unexpected:#1c5cb8;
-      --accent:#0f7ea8;
-      --accent-soft:#d7eef8;
-      --card:#ffffff;
-      --border:rgba(16,33,45,0.14);
-      --ring:rgba(15,126,168,0.25);
-      --shadow-soft:0 10px 24px rgba(18, 35, 50, 0.08);
-      --shadow-strong:0 22px 38px rgba(18, 35, 50, 0.14);
+      --bg:#0a1120;
+      --bg-2:#0e172b;
+      --surface:rgba(17, 27, 45, 0.88);
+      --surface-strong:#121d33;
+      --surface-soft:#17253e;
+      --ink:#e6eefc;
+      --muted:#9aabc3;
+      --edge:#7f93b2;
+      --edge-found:#31cf7f;
+      --edge-missing:#ff627c;
+      --edge-unexpected:#5ba7ff;
+      --accent:#4bc4ff;
+      --accent-soft:rgba(75, 196, 255, 0.2);
+      --card:#121f36;
+      --border:rgba(148, 163, 184, 0.26);
+      --ring:rgba(75, 196, 255, 0.35);
+      --shadow-soft:0 10px 24px rgba(2, 6, 15, 0.45);
+      --shadow-strong:0 22px 38px rgba(2, 6, 15, 0.58);
     }
     *{box-sizing:border-box}
     *::-webkit-scrollbar{width:10px;height:10px}
     *::-webkit-scrollbar-thumb{
-      background:linear-gradient(180deg, rgba(113,133,150,0.58), rgba(84,103,120,0.6));
+      background:linear-gradient(180deg, rgba(124,146,176,0.62), rgba(90,110,138,0.64));
       border-radius:999px;
       border:2px solid transparent;
       background-clip:padding-box;
@@ -287,8 +287,8 @@ DEBUG_SITE_HTML = """<!doctype html>
       font-family:"Sora","IBM Plex Sans","Segoe UI",sans-serif;
       color:var(--ink);
       background:
-        radial-gradient(1200px 460px at -12% -8%, #d2e8ff 0%, transparent 62%),
-        radial-gradient(820px 360px at 108% -6%, #ffe7c4 0%, transparent 62%),
+        radial-gradient(1100px 430px at -12% -8%, rgba(41,92,170,0.3) 0%, transparent 62%),
+        radial-gradient(860px 340px at 108% -6%, rgba(23,156,143,0.2) 0%, transparent 62%),
         linear-gradient(145deg, var(--bg) 0%, var(--bg-2) 100%);
       min-height:100vh;
       line-height:1.35;
@@ -301,11 +301,11 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
     .sidebar{
       border-right:1px solid var(--border);
-      background:rgba(255,255,255,0.66);
+      background:rgba(10,17,30,0.82);
       backdrop-filter:blur(14px);
       padding:18px 16px 14px;
       overflow:auto;
-      box-shadow:inset -1px 0 0 rgba(255,255,255,0.46);
+      box-shadow:inset -1px 0 0 rgba(138,166,204,0.08);
     }
     .brand{
       margin:0 0 4px 0;
@@ -347,20 +347,24 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
     .mini-btn{
       border:1px solid var(--border);
-      background:linear-gradient(180deg, #fff 0%, #f1f7fb 100%);
+      background:linear-gradient(180deg, rgba(30,47,73,0.98) 0%, rgba(23,36,58,0.98) 100%);
       color:var(--ink);
       border-radius:999px;
       padding:7px 11px;
       cursor:pointer;
       font-size:0.77rem;
       font-weight:650;
-      box-shadow:0 4px 10px rgba(17,45,65,0.07);
+      box-shadow:0 6px 14px rgba(2,8,18,0.35);
       transition:border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
     }
     .mini-btn:hover{
-      border-color:rgba(16,33,45,0.3);
+      border-color:rgba(103, 202, 255, 0.45);
       transform:translateY(-1px);
-      box-shadow:0 8px 18px rgba(17,45,65,0.12);
+      box-shadow:0 10px 20px rgba(6, 16, 32, 0.45);
+    }
+    .mini-btn:focus-visible{
+      outline:none;
+      box-shadow:0 0 0 3px var(--ring), 0 10px 20px rgba(6, 16, 32, 0.45);
     }
     input[type="text"], select{
       width:100%;
@@ -368,16 +372,16 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-radius:11px;
       padding:8px 10px;
       font-size:0.82rem;
-      background:#fbfdff;
+      background:rgba(16, 25, 41, 0.95);
       color:var(--ink);
       transition:border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
     }
-    input[type="text"]::placeholder{color:#8ea0ad}
+    input[type="text"]::placeholder{color:#7f93b2}
     input[type="text"]:focus, select:focus{
       outline:none;
-      border-color:rgba(15,126,168,0.55);
+      border-color:rgba(75,196,255,0.62);
       box-shadow:0 0 0 3px var(--ring);
-      background:#ffffff;
+      background:rgba(20, 32, 52, 1);
     }
     .tabs{
       display:flex;
@@ -387,22 +391,22 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
     .tab{
       border:1px solid var(--border);
-      background:linear-gradient(180deg, #fff 0%, #f1f6fb 100%);
-      color:#214052;
+      background:linear-gradient(180deg, rgba(29,45,70,0.96) 0%, rgba(21,34,54,0.96) 100%);
+      color:var(--ink);
       border-radius:999px;
       padding:7px 13px;
       cursor:pointer;
       font-size:0.82rem;
       font-weight:630;
       transition:all 140ms ease;
-      box-shadow:0 4px 10px rgba(17,45,65,0.07);
+      box-shadow:0 6px 12px rgba(4, 10, 24, 0.35);
     }
     .tab:hover{transform:translateY(-1px)}
     .tab.active{
-      background:linear-gradient(145deg, #1186b5 0%, #0e6e93 100%);
-      color:white;
-      border-color:#0e6e93;
-      box-shadow:0 8px 18px rgba(16,108,146,0.28);
+      background:linear-gradient(145deg, #2aa7da 0%, #1e7ea8 100%);
+      color:#f5fbff;
+      border-color:#36bae9;
+      box-shadow:0 8px 18px rgba(20, 131, 179, 0.4);
     }
     .control-label{
       display:block;
@@ -426,7 +430,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       width:100%;
       text-align:left;
       border:1px solid var(--border);
-      background:linear-gradient(180deg, #fff 0%, #f7fbff 100%);
+      background:linear-gradient(180deg, rgba(24,37,59,0.98) 0%, rgba(18,30,49,0.98) 100%);
       border-radius:11px;
       padding:8px 10px;
       color:var(--ink);
@@ -435,9 +439,9 @@ DEBUG_SITE_HTML = """<!doctype html>
       transition:all 140ms ease;
     }
     .table-list button:hover{
-      border-color:rgba(16,33,45,0.28);
+      border-color:rgba(102, 202, 255, 0.42);
       transform:translateX(1px);
-      box-shadow:0 8px 16px rgba(18,35,50,0.09);
+      box-shadow:0 10px 20px rgba(3, 10, 20, 0.42);
     }
     .main{
       padding:18px;
@@ -446,10 +450,55 @@ DEBUG_SITE_HTML = """<!doctype html>
       flex-direction:column;
       gap:14px;
     }
+    .topbar{
+      margin-bottom:0;
+      display:grid;
+      gap:12px;
+      grid-template-columns:220px minmax(0,1fr);
+      align-items:end;
+    }
+    .topbar-head{
+      display:grid;
+      gap:4px;
+    }
+    .dataset-badge{
+      font-size:0.68rem;
+      letter-spacing:0.16em;
+      text-transform:uppercase;
+      color:var(--muted);
+      font-weight:700;
+    }
+    .dataset-title{
+      margin:0;
+      font-size:1.05rem;
+      color:var(--ink);
+      line-height:1.2;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .topbar-controls{
+      display:grid;
+      grid-template-columns:minmax(230px,1fr) 240px 260px;
+      gap:10px;
+      align-items:end;
+    }
+    .topbar-field{
+      min-width:0;
+    }
+    .search-field input[type="text"]{
+      height:38px;
+    }
+    .confidence-field{
+      padding:8px 10px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:linear-gradient(165deg, rgba(22,35,57,0.94), rgba(17,27,44,0.94));
+    }
     .coverage-strip{
       margin-bottom:0;
       padding:10px;
-      background:linear-gradient(120deg, rgba(255,255,255,0.88), rgba(242,249,255,0.9));
+      background:linear-gradient(120deg, rgba(19,30,50,0.94), rgba(15,24,40,0.95));
     }
     .metric-grid{
       display:grid;
@@ -459,9 +508,9 @@ DEBUG_SITE_HTML = """<!doctype html>
     .metric-card{
       border:1px solid var(--border);
       border-radius:12px;
-      background:linear-gradient(160deg, #ffffff 0%, #f4f8fc 100%);
+      background:linear-gradient(160deg, rgba(23,35,56,0.98) 0%, rgba(17,27,44,0.98) 100%);
       padding:9px 9px 10px;
-      box-shadow:0 5px 14px rgba(18,35,50,0.08);
+      box-shadow:0 8px 16px rgba(2, 8, 18, 0.4);
       position:relative;
       overflow:hidden;
     }
@@ -472,8 +521,8 @@ DEBUG_SITE_HTML = """<!doctype html>
       left:0;
       right:0;
       height:2px;
-      background:linear-gradient(90deg, #1b93c7 0%, #23a46e 100%);
-      opacity:0.7;
+      background:linear-gradient(90deg, #4bc4ff 0%, #31cf7f 100%);
+      opacity:0.9;
     }
     .metric-label{
       display:block;
@@ -488,11 +537,11 @@ DEBUG_SITE_HTML = """<!doctype html>
       font-size:1rem;
       font-weight:760;
       line-height:1.1;
-      color:#0f2836;
+      color:var(--ink);
     }
     .workspace-shell{
       display:grid;
-      grid-template-columns:minmax(0,1fr) 380px;
+      grid-template-columns:minmax(0,1fr) 420px;
       gap:14px;
       align-items:flex-start;
       margin-bottom:14px;
@@ -504,7 +553,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       max-height:72vh;
       border-radius:16px;
       border:1px solid var(--border);
-      background:rgba(255,255,255,0.95);
+      background:rgba(13,22,37,0.94);
       box-shadow:var(--shadow-strong);
       height:100%;
     }
@@ -520,7 +569,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .canvas-wrap{
       position:relative;
       border:1px solid var(--border);
-      background:rgba(255,255,255,0.86);
+      background:rgba(13,22,37,0.92);
       border-radius:16px;
       box-shadow:var(--shadow-strong);
       min-height:680px;
@@ -531,8 +580,8 @@ DEBUG_SITE_HTML = """<!doctype html>
       width:1800px;
       height:1200px;
       background:
-        linear-gradient(transparent 31px, rgba(120,140,160,0.08) 32px),
-        linear-gradient(90deg, transparent 31px, rgba(120,140,160,0.08) 32px);
+        linear-gradient(transparent 31px, rgba(128,148,176,0.08) 32px),
+        linear-gradient(90deg, transparent 31px, rgba(128,148,176,0.08) 32px);
       background-size:32px 32px;
     }
     .edge-layer{
@@ -548,7 +597,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       fill:none;
       stroke:var(--edge);
       stroke-width:1.9;
-      opacity:0.72;
+      opacity:0.5;
       pointer-events:stroke;
       cursor:pointer;
       transition:opacity 140ms ease, stroke-width 140ms ease, stroke 140ms ease, filter 140ms ease;
@@ -556,16 +605,18 @@ DEBUG_SITE_HTML = """<!doctype html>
     .edge-layer path.edge-found{stroke:var(--edge-found)}
     .edge-layer path.edge-missing{stroke:var(--edge-missing)}
     .edge-layer path.edge-unexpected{stroke:var(--edge-unexpected)}
+    .edge-layer path.edge-discovered{stroke:var(--edge)}
     .edge-layer path.edge-unknown{stroke:var(--edge)}
-    .edge-layer path.derived-edge{stroke-dasharray:6 6}
+    .edge-layer path.derived-edge{stroke-dasharray:6 6; opacity:0.6}
     .edge-layer path.selected{
       stroke-width:3.5;
       opacity:1;
-      filter:drop-shadow(0 0 4px rgba(20,32,45,0.34));
+      filter:drop-shadow(0 0 7px rgba(86, 183, 255, 0.65));
     }
     .edge-layer path:hover{
       opacity:1;
       stroke-width:2.8;
+      filter:drop-shadow(0 0 4px rgba(117, 197, 255, 0.35));
     }
     .table-card{
       position:absolute;
@@ -573,7 +624,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       background:var(--card);
       border:1px solid var(--border);
       border-radius:14px;
-      box-shadow:0 16px 30px rgba(20,37,52,0.16);
+      box-shadow:0 16px 30px rgba(2, 8, 18, 0.5);
       overflow:hidden;
       z-index:3;
       transition:transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
@@ -582,14 +633,14 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
     .table-card:hover{
       transform:translateY(-2px);
-      box-shadow:0 20px 36px rgba(20,37,52,0.2);
+      box-shadow:0 24px 38px rgba(2, 8, 18, 0.62);
     }
     .table-card.dimmed{
-      opacity:0.24;
+      opacity:0.2;
       filter:saturate(0.8);
     }
     .table-head{
-      background:linear-gradient(120deg,#f2f9ff 0%,#eaf6f2 100%);
+      background:linear-gradient(120deg, rgba(35,56,86,0.95) 0%, rgba(24,42,68,0.95) 100%);
       border-bottom:1px solid var(--border);
       padding:10px 12px;
       cursor:grab;
@@ -618,21 +669,21 @@ DEBUG_SITE_HTML = """<!doctype html>
       justify-content:space-between;
       gap:8px;
       padding:7px 10px;
-      border-bottom:1px dashed rgba(16,33,45,0.14);
+      border-bottom:1px dashed rgba(130,152,182,0.18);
       font-family:"IBM Plex Mono","Fira Code","Consolas",monospace;
       font-size:0.73rem;
-      background:#ffffff;
+      background:rgba(16, 26, 43, 0.98);
     }
-    .column-list li:nth-child(even){background:#fbfdff}
+    .column-list li:nth-child(even){background:rgba(13, 22, 37, 0.98)}
     .column-list li.join-col{
       background:var(--accent-soft);
-      color:#0f5f7d;
+      color:#b9e9ff;
       font-weight:600;
     }
     .data-grid,.truth-grid{
       border:1px solid var(--border);
       border-radius:16px;
-      background:rgba(255,255,255,0.9);
+      background:rgba(14, 24, 40, 0.94);
       box-shadow:var(--shadow-strong);
       display:flex;
       flex-direction:column;
@@ -646,7 +697,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-bottom:1px solid var(--border);
       align-items:center;
       flex-wrap:wrap;
-      background:linear-gradient(120deg, #f7fbff 0%, #edf6fa 100%);
+      background:linear-gradient(120deg, rgba(20,33,53,0.96) 0%, rgba(15,26,43,0.96) 100%);
     }
     .table-preview{
       overflow:auto;
@@ -665,12 +716,43 @@ DEBUG_SITE_HTML = """<!doctype html>
     .right-rail{
       border:1px solid var(--border);
       border-radius:16px;
-      background:rgba(255,255,255,0.9);
+      background:rgba(14, 24, 40, 0.94);
       box-shadow:var(--shadow-strong);
       overflow:auto;
       padding:12px;
       align-self:stretch;
       min-height:360px;
+    }
+    .rail-section.inspector{
+      background:linear-gradient(165deg, rgba(24,38,61,0.98) 0%, rgba(18,30,50,0.98) 100%);
+    }
+    .inspector-block{
+      border:1px dashed rgba(133,156,186,0.24);
+      border-radius:10px;
+      padding:8px;
+      margin-bottom:8px;
+      background:rgba(16, 27, 45, 0.9);
+    }
+    .inspector-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:6px 10px;
+      font-size:0.78rem;
+    }
+    .inspector-grid strong{
+      color:#b7d9ff;
+      font-size:0.72rem;
+      text-transform:uppercase;
+      letter-spacing:0.05em;
+      display:block;
+      margin-bottom:2px;
+    }
+    .inspector-list{
+      font-family:"IBM Plex Mono","Fira Code","Consolas",monospace;
+      font-size:0.73rem;
+      line-height:1.35;
+      display:grid;
+      gap:4px;
     }
     .right-rail h3{
       margin:0 0 10px 0;
@@ -682,10 +764,10 @@ DEBUG_SITE_HTML = """<!doctype html>
     .rail-section{
       border:1px solid var(--border);
       border-radius:12px;
-      background:linear-gradient(160deg, #ffffff 0%, #f7fbff 100%);
+      background:linear-gradient(160deg, rgba(23,36,57,0.98) 0%, rgba(17,28,46,0.98) 100%);
       padding:10px;
       margin-bottom:10px;
-      box-shadow:0 6px 14px rgba(18,35,50,0.08);
+      box-shadow:0 8px 16px rgba(2, 8, 18, 0.4);
     }
     .rail-section h4{
       margin:0 0 8px 0;
@@ -708,13 +790,15 @@ DEBUG_SITE_HTML = """<!doctype html>
     .rail-section.found h4{ color:var(--edge-found); }
     .rail-section.missing h4{ color:var(--edge-missing); }
     .rail-section.unexpected h4{ color:var(--edge-unexpected); }
+    .rail-section.discovered h4{ color:var(--edge); }
     .rail-section.found .rail-list li{ color:var(--edge-found); }
     .rail-section.missing .rail-list li{ color:var(--edge-missing); }
     .rail-section.unexpected .rail-list li{ color:var(--edge-unexpected); }
+    .rail-section.discovered .rail-list li{ color:var(--ink); }
     .truth-card{
       border:1px solid var(--border);
       border-radius:12px;
-      background:#fffdf8;
+      background:rgba(24, 38, 61, 0.94);
       padding:10px;
     }
     .truth-card h4{
@@ -742,29 +826,29 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-spacing:0;
       width:100%;
       min-width:760px;
-      background:white;
-      border:1px solid rgba(16,33,45,0.14);
+      background:rgba(12, 20, 34, 0.98);
+      border:1px solid rgba(130,152,182,0.24);
       border-radius:12px;
       overflow:hidden;
     }
     table.preview th,table.preview td{
-      border-bottom:1px solid rgba(16,33,45,0.1);
+      border-bottom:1px solid rgba(130,152,182,0.18);
       padding:7px 8px;
       font-size:0.78rem;
       text-align:left;
       white-space:nowrap;
     }
-    table.preview td+td, table.preview th+th{border-left:1px solid rgba(16,33,45,0.08)}
+    table.preview td+td, table.preview th+th{border-left:1px solid rgba(130,152,182,0.16)}
     table.preview th{
       position:sticky;
       top:0;
-      background:linear-gradient(120deg, #eef6fd 0%, #e8f4ef 100%);
+      background:linear-gradient(120deg, rgba(29,47,73,0.98) 0%, rgba(23,38,61,0.98) 100%);
       z-index:2;
       font-weight:700;
       font-size:0.74rem;
       text-transform:uppercase;
       letter-spacing:0.05em;
-      color:#26485c;
+      color:#c9dcf6;
     }
     .hint{
       font-size:0.77rem;
@@ -782,33 +866,41 @@ DEBUG_SITE_HTML = """<!doctype html>
       text-transform:uppercase;
     }
     .truth-badge.found{
-      background:#dff8ea;
-      color:#1b7d4e;
-      border:1px solid #8fd3ad;
+      background:rgba(49,207,127,0.18);
+      color:#78e9b0;
+      border:1px solid rgba(49,207,127,0.42);
     }
     .truth-badge.unexpected{
-      background:#e4ecff;
-      color:#1a3b74;
-      border:1px solid #9ab6f6;
+      background:rgba(91,167,255,0.18);
+      color:#9ecbff;
+      border:1px solid rgba(91,167,255,0.46);
     }
     .truth-badge.missing{
-      background:#ffe6e9;
-      color:#a52f3f;
-      border:1px solid #efabb5;
+      background:rgba(255,98,124,0.18);
+      color:#ff9baf;
+      border:1px solid rgba(255,98,124,0.44);
     }
     .truth-badge.unknown{
-      background:#fff0e4;
-      color:#b56026;
-      border:1px solid #f0c8a8;
+      background:rgba(146,170,201,0.16);
+      color:#cad9ee;
+      border:1px solid rgba(146,170,201,0.38);
+    }
+    .truth-badge.discovered{
+      background:rgba(127,147,178,0.2);
+      color:#cedaf0;
+      border:1px solid rgba(127,147,178,0.42);
+    }
+    .is-hidden{
+      display:none !important;
     }
     .edge-tooltip{
       position:fixed;
       pointer-events:none;
-      background:rgba(15,30,50,0.96);
-      color:#f2f6ff;
+      background:rgba(8,15,27,0.98);
+      color:#e7f0ff;
       border-radius:12px;
       padding:10px 14px;
-      box-shadow:0 12px 30px rgba(15,30,50,0.35);
+      box-shadow:0 16px 34px rgba(2, 8, 18, 0.66);
       font-size:0.82rem;
       line-height:1.35;
       z-index:20;
@@ -822,6 +914,12 @@ DEBUG_SITE_HTML = """<!doctype html>
     @media (max-width:1500px){
       .metric-grid{
         grid-template-columns:repeat(4, minmax(90px, 1fr));
+      }
+      .topbar{
+        grid-template-columns:1fr;
+      }
+      .topbar-controls{
+        grid-template-columns:minmax(0,1fr) 220px 240px;
       }
       .workspace-shell{
         grid-template-columns:1fr;
@@ -838,6 +936,9 @@ DEBUG_SITE_HTML = """<!doctype html>
         box-shadow:none;
       }
       .main{padding:12px}
+      .topbar-controls{
+        grid-template-columns:1fr;
+      }
       .diagram-canvas{width:1300px;height:1000px}
       .metric-grid{
         grid-template-columns:repeat(2, minmax(120px, 1fr));
@@ -848,24 +949,27 @@ DEBUG_SITE_HTML = """<!doctype html>
 <body>
   <div class="shell">
     <aside class="sidebar">
-      <h1 class="brand">Smartjoin Debug Viewer</h1>
-      <p class="sub">Relationship map and table previews for debugging inference output.</p>
+      <h1 class="brand">Smartjoin Workbench</h1>
+      <p class="sub">Discovery-first relationship investigation with optional evaluation overlay.</p>
       <section class="panel">
-        <h3>Filter</h3>
+        <h3>Filters</h3>
         <div class="control-stack">
-          <label class="control-label" for="confidenceRange">Min confidence</label>
-          <input id="confidenceRange" type="range" min="0" max="1" step="0.01" value="0.75">
-          <div class="hint">Current threshold: <strong id="confidenceLabel">0.75</strong></div>
-
-          <label class="control-label" for="tableSearch">Table/column search</label>
-          <input id="tableSearch" type="text" placeholder="Try: orders, customer_id, payment">
-
-          <label class="control-label" for="edgeMode">Edge type</label>
+          <label class="control-label" for="edgeMode">Relationship status</label>
           <select id="edgeMode">
-            <option value="all">All relationships</option>
-            <option value="found">Joins Found</option>
-            <option value="missing">Missing Joins</option>
-            <option value="unexpected">Unexpected Joins</option>
+            <option value="all">All discovered</option>
+            <option value="discovered">Discovered only</option>
+          </select>
+
+          <label class="control-label" for="relationshipTypeFilter">Relationship type</label>
+          <select id="relationshipTypeFilter">
+            <option value="all">All types</option>
+          </select>
+
+          <label class="control-label" for="derivedFilter">Derived filter</label>
+          <select id="derivedFilter">
+            <option value="both">Direct + Derived</option>
+            <option value="direct">Direct only</option>
+            <option value="derived">Derived only</option>
           </select>
 
           <div class="tool-row">
@@ -885,16 +989,40 @@ DEBUG_SITE_HTML = """<!doctype html>
       </section>
     </aside>
     <main class="main">
+      <header class="topbar panel">
+        <div class="topbar-head">
+          <div class="dataset-badge">Dataset</div>
+          <h2 class="dataset-title" id="datasetTitle">Smartjoin Dataset</h2>
+        </div>
+        <div class="topbar-controls">
+          <div class="topbar-field search-field">
+            <label class="control-label" for="tableSearch">Table/column search</label>
+            <input id="tableSearch" type="text" placeholder="Search tables or columns">
+          </div>
+          <div class="topbar-field">
+            <label class="control-label" for="modeToggle">Mode</label>
+            <select id="modeToggle">
+              <option value="discovered">Discovered Relationships</option>
+              <option value="evaluation">Evaluation Overlay</option>
+            </select>
+          </div>
+          <div class="topbar-field confidence-field">
+            <label class="control-label" for="confidenceRange">Min confidence</label>
+            <input id="confidenceRange" type="range" min="0" max="1" step="0.01" value="0.75">
+            <div class="hint">Threshold: <strong id="confidenceLabel">0.75</strong></div>
+          </div>
+        </div>
+      </header>
       <section class="panel coverage-strip">
         <div class="metric-grid">
-          <div class="metric-card"><span class="metric-label">Expected</span><span class="metric-value" id="covExpected">0</span></div>
-          <div class="metric-card"><span class="metric-label">Predicted</span><span class="metric-value" id="covPredicted">0</span></div>
-          <div class="metric-card"><span class="metric-label">Found</span><span class="metric-value" id="covFound">0</span></div>
-          <div class="metric-card"><span class="metric-label">Missing</span><span class="metric-value" id="covMissing">0</span></div>
-          <div class="metric-card"><span class="metric-label">Unexpected</span><span class="metric-value" id="covUnexpected">0</span></div>
-          <div class="metric-card"><span class="metric-label">Recall</span><span class="metric-value" id="covRecall">0.0%</span></div>
-          <div class="metric-card"><span class="metric-label">Precision</span><span class="metric-value" id="covPrecision">0.0%</span></div>
-          <div class="metric-card"><span class="metric-label">Threshold</span><span class="metric-value" id="covThreshold">0.75</span></div>
+          <div class="metric-card"><span class="metric-label">Tables</span><span class="metric-value" id="metricTables">0</span></div>
+          <div class="metric-card"><span class="metric-label">Visible Joins</span><span class="metric-value" id="metricVisible">0</span></div>
+          <div class="metric-card"><span class="metric-label">Derived Joins</span><span class="metric-value" id="metricDerived">0</span></div>
+          <div class="metric-card"><span class="metric-label">Avg Confidence</span><span class="metric-value" id="metricAvgConfidence">0.00</span></div>
+          <div class="metric-card" id="metricCardFound"><span class="metric-label">Found</span><span class="metric-value" id="metricFound">0</span></div>
+          <div class="metric-card" id="metricCardMissing"><span class="metric-label">Missing</span><span class="metric-value" id="metricMissing">0</span></div>
+          <div class="metric-card" id="metricCardUnexpected"><span class="metric-label">Unexpected</span><span class="metric-value" id="metricUnexpected">0</span></div>
+          <div class="metric-card"><span class="metric-label">Threshold</span><span class="metric-value" id="metricThreshold">0.75</span></div>
         </div>
       </section>
       <div class="workspace-shell">
@@ -908,19 +1036,26 @@ DEBUG_SITE_HTML = """<!doctype html>
           </div>
         </div>
         <aside class="right-rail">
-          <h3>Evaluation</h3>
-          <section class="rail-section found">
-            <h4>Joins Found</h4>
+          <section class="rail-section inspector">
+            <h4>Selected Relationship</h4>
+            <div class="rail-list" id="relationshipInspector">
+              <div class="hint">Select an edge to inspect relationship details.</div>
+            </div>
+          </section>
+          <h3 id="evaluationTitle">Relationships</h3>
+          <section class="rail-section discovered" id="primaryRailSection">
+            <h4 id="primaryRailHeading">Discovered Joins</h4>
             <div class="rail-list" id="joinsFoundList"></div>
           </section>
-          <section class="rail-section missing">
+          <section class="rail-section missing" id="missingRailSection">
             <h4>Missing Joins</h4>
             <div class="rail-list" id="missingJoinsList"></div>
           </section>
-          <section class="rail-section unexpected">
+          <section class="rail-section unexpected" id="unexpectedRailSection">
             <h4>Unexpected Joins</h4>
             <div class="rail-list" id="unexpectedJoinsList"></div>
           </section>
+          <div class="hint is-hidden" id="evaluationHint"></div>
         </aside>
       </div>
       <section id="dataView" class="data-grid">
@@ -944,6 +1079,10 @@ DEBUG_SITE_HTML = """<!doctype html>
       matchingTables: new Set(),
       tableQuery: "",
       edgeMode: "all",
+      viewerMode: "discovered",
+      relationshipType: "all",
+      derivedMode: "both",
+      hasGroundTruth: false,
       selectedRelationshipKey: null,
       relationshipPool: [],
     };
@@ -955,20 +1094,237 @@ DEBUG_SITE_HTML = """<!doctype html>
       return state.payload.tables.find((t) => t.name === name);
     }
 
+    function setHidden(id, hidden) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle("is-hidden", Boolean(hidden));
+    }
+
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = String(text);
+    }
+
+    function isEvaluationOverlayActive() {
+      return state.hasGroundTruth && state.viewerMode === "evaluation";
+    }
+
+    function configureModeOptions() {
+      const modeToggle = document.getElementById("modeToggle");
+      if (!modeToggle) return;
+      const evaluationOption = modeToggle.querySelector('option[value="evaluation"]');
+      if (evaluationOption) {
+        evaluationOption.disabled = !state.hasGroundTruth;
+      }
+      if (!state.hasGroundTruth && state.viewerMode === "evaluation") {
+        state.viewerMode = "discovered";
+      }
+      modeToggle.value = state.viewerMode;
+    }
+
+    function configureEdgeModeOptions() {
+      const edgeModeSelect = document.getElementById("edgeMode");
+      if (!edgeModeSelect) return;
+      const options = isEvaluationOverlayActive()
+        ? [
+            { value: "all", label: "All relationships" },
+            { value: "found", label: "Found joins" },
+            { value: "missing", label: "Missing joins" },
+            { value: "unexpected", label: "Unexpected joins" },
+          ]
+        : [
+            { value: "all", label: "All discovered" },
+            { value: "discovered", label: "Discovered only" },
+          ];
+      edgeModeSelect.innerHTML = "";
+      options.forEach((option) => {
+        const node = document.createElement("option");
+        node.value = option.value;
+        node.textContent = option.label;
+        edgeModeSelect.appendChild(node);
+      });
+      if (!options.some((option) => option.value === state.edgeMode)) {
+        state.edgeMode = "all";
+      }
+      edgeModeSelect.value = state.edgeMode;
+    }
+
+    function configureRelationshipTypeOptions() {
+      const typeSelect = document.getElementById("relationshipTypeFilter");
+      if (!typeSelect) return;
+      const types = new Set();
+      (state.payload?.report?.joins || []).forEach((join) => {
+        const value = String(join.relationship_guess || "").trim();
+        if (value) types.add(value);
+      });
+      const options = ["all", ...Array.from(types).sort((a, b) => a.localeCompare(b))];
+      typeSelect.innerHTML = "";
+      options.forEach((option) => {
+        const node = document.createElement("option");
+        node.value = option;
+        node.textContent = option === "all" ? "All types" : option;
+        typeSelect.appendChild(node);
+      });
+      if (!options.includes(state.relationshipType)) {
+        state.relationshipType = "all";
+      }
+      typeSelect.value = state.relationshipType;
+    }
+
+    function configureEvaluationUI() {
+      const evaluationActive = isEvaluationOverlayActive();
+      setText("evaluationTitle", evaluationActive ? "Evaluation Overlay" : "Relationship Discovery");
+      setText("primaryRailHeading", evaluationActive ? "Joins Found" : "Discovered Joins");
+
+      const primaryRailSection = document.getElementById("primaryRailSection");
+      if (primaryRailSection) {
+        primaryRailSection.classList.toggle("found", evaluationActive);
+        primaryRailSection.classList.toggle("discovered", !evaluationActive);
+      }
+
+      setHidden("missingRailSection", !evaluationActive);
+      setHidden("unexpectedRailSection", !evaluationActive);
+      setHidden("metricCardFound", !state.hasGroundTruth);
+      setHidden("metricCardMissing", !state.hasGroundTruth);
+      setHidden("metricCardUnexpected", !state.hasGroundTruth);
+      setHidden("evaluationHint", false);
+
+      if (evaluationActive) {
+        setText(
+          "evaluationHint",
+          "Ground-truth overlay from manifest.json is active (found/missing/unexpected)."
+        );
+        return;
+      }
+      if (state.hasGroundTruth) {
+        setText(
+          "evaluationHint",
+          "Discovery mode is active. Switch to Evaluation Overlay for found/missing/unexpected."
+        );
+        return;
+      }
+      setText(
+        "evaluationHint",
+        "No manifest.json found. Showing discovered relationships only."
+      );
+    }
+
+    function visualCategoryFor(rel) {
+      if (isEvaluationOverlayActive()) {
+        return rel.category || "unknown";
+      }
+      if (rel.category === "missing") {
+        return "hidden";
+      }
+      return "discovered";
+    }
+
     function activeRelationships() {
       const matchingTables = refreshMatchingTables();
       return state.relationshipPool.filter((rel) => {
-        if (rel.category !== "missing" && rel.confidence < state.threshold) return false;
+        const visualCategory = visualCategoryFor(rel);
+        if (visualCategory === "hidden") {
+          return false;
+        }
+        if (rel.category !== "missing" && Number(rel.confidence || 0) < state.threshold) {
+          return false;
+        }
+        if (state.relationshipType !== "all" && rel.relationship_guess !== state.relationshipType) {
+          return false;
+        }
+        const isDerived = Boolean(rel.derived);
+        if (state.derivedMode === "direct" && isDerived) {
+          return false;
+        }
+        if (state.derivedMode === "derived" && !isDerived) {
+          return false;
+        }
         if (matchingTables.size > 0) {
           if (!(matchingTables.has(rel.left_table) || matchingTables.has(rel.right_table))) {
             return false;
           }
         }
-        if (state.edgeMode !== "all" && rel.category !== state.edgeMode) {
+        if (state.edgeMode !== "all" && visualCategory !== state.edgeMode) {
           return false;
         }
         return true;
       });
+    }
+
+    function relationshipByKey(key) {
+      if (!key) return null;
+      return (
+        activeRelationships().find((rel) => {
+          const leftRef = `${rel.left_table}.${rel.left_column}`;
+          const rightRef = `${rel.right_table}.${rel.right_column}`;
+          return relationKey(leftRef, rightRef) === key;
+        }) || null
+      );
+    }
+
+    function renderRelationshipInspector() {
+      const target = document.getElementById("relationshipInspector");
+      if (!target) return;
+      const rel = relationshipByKey(state.selectedRelationshipKey);
+      if (!rel) {
+        target.innerHTML = `<div class="hint">Select an edge to inspect relationship details.</div>`;
+        return;
+      }
+
+      const left = `${rel.left_table}.${rel.left_column}`;
+      const right = `${rel.right_table}.${rel.right_column}`;
+      const status = visualCategoryFor(rel);
+      const confidence = Number(rel.confidence || 0).toFixed(3);
+      const modeLabel = rel.derived ? "Derived" : "Direct";
+      const derivedDescription = rel.derived?.description || rel.derived?.transform_id || "n/a";
+      const derivedParams = rel.derived?.params ? JSON.stringify(rel.derived.params) : "";
+      const signals = Object.entries(rel.breakdown?.signals || {})
+        .map(
+          ([name, value]) =>
+            `<li><strong>${escapeHtml(name)}</strong>: ${Number(value).toFixed(3)}</li>`
+        )
+        .join("");
+      const examples = (rel.example_mappings || [])
+        .slice(0, 3)
+        .map(
+          (item) =>
+            `<li>${escapeHtml(String(item?.from ?? ""))} -> ${escapeHtml(String(item?.to ?? ""))}</li>`
+        )
+        .join("");
+      const derivedExamples = (rel.derived?.example_mappings || [])
+        .slice(0, 3)
+        .map(
+          (item) =>
+            `<li>${escapeHtml(String(item?.from ?? ""))} -> ${escapeHtml(String(item?.to ?? ""))}</li>`
+        )
+        .join("");
+
+      target.innerHTML = `
+        <div class="inspector-block">
+          <div class="truth-badge ${escapeHtml(status)}">${escapeHtml(status)}</div>
+          <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(left)} -> ${escapeHtml(right)}</div>
+          <div class="inspector-grid">
+            <div><strong>Confidence</strong>${confidence}</div>
+            <div><strong>Relationship</strong>${escapeHtml(String(rel.relationship_guess || "unknown"))}</div>
+            <div><strong>Mode</strong>${modeLabel}</div>
+            <div><strong>Derived Transform</strong>${escapeHtml(String(derivedDescription))}</div>
+          </div>
+          ${derivedParams ? `<div class="hint" style="margin-top:6px;">params: ${escapeHtml(derivedParams)}</div>` : ""}
+        </div>
+        <div class="inspector-block">
+          <strong style="display:block; margin-bottom:4px;">Evidence Signals</strong>
+          <ul class="inspector-list">${signals || "<li>none</li>"}</ul>
+        </div>
+        <div class="inspector-block">
+          <strong style="display:block; margin-bottom:4px;">Sample Examples</strong>
+          <ul class="inspector-list">${examples || "<li>none</li>"}</ul>
+          ${
+            derivedExamples
+              ? `<strong style="display:block; margin:8px 0 4px;">Derived Examples</strong><ul class="inspector-list">${derivedExamples}</ul>`
+              : ""
+          }
+        </div>
+      `;
     }
 
     function splitRef(ref) {
@@ -985,8 +1341,11 @@ DEBUG_SITE_HTML = """<!doctype html>
       const left = `${join.left_table}.${join.left_column}`;
       const right = `${join.right_table}.${join.right_column}`;
       const key = relationKey(left, right);
-      let category = expectedKeys.has(key) ? "found" : "unexpected";
-      if (!hasGroundTruth) category = "found";
+      const category = hasGroundTruth
+        ? expectedKeys.has(key)
+          ? "found"
+          : "unexpected"
+        : "discovered";
       return {
         ...join,
         key,
@@ -1032,6 +1391,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       const left = `${rel.left_table}.${rel.left_column}`;
       const right = `${rel.right_table}.${rel.right_column}`;
       const labelMap = {
+        discovered: "Discovered Join",
         found: "Join Found",
         missing: "Missing Join",
         unexpected: "Unexpected Join",
@@ -1161,6 +1521,13 @@ DEBUG_SITE_HTML = """<!doctype html>
       return map;
     }
 
+    function switchToData() {
+      const dataView = document.getElementById("dataView");
+      if (dataView) {
+        dataView.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
     function renderTableList() {
       const list = document.getElementById("tableList");
       list.innerHTML = "";
@@ -1252,19 +1619,15 @@ DEBUG_SITE_HTML = """<!doctype html>
         const leftRef = `${rel.left_table}.${rel.left_column}`;
         const rightRef = `${rel.right_table}.${rel.right_column}`;
         const relKey = relationKey(leftRef, rightRef);
-        const category = rel.category || "unknown";
-        const truthState =
-          category === "missing"
-            ? "missing"
-            : category === "unexpected"
-            ? "unexpected"
-            : category === "found"
-            ? "found"
-            : "unknown";
+        const truthState = visualCategoryFor(rel);
+        if (truthState === "hidden") {
+          return;
+        }
 
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`);
         path.setAttribute("stroke-opacity", String(clamp(rel.confidence, 0.25, 1)));
+        path.style.strokeWidth = `${1.2 + clamp(Number(rel.confidence || 0), 0, 1) * 2.1}px`;
         path.classList.add(`edge-${truthState}`);
         if (rel.derived) {
           path.classList.add("derived-edge");
@@ -1277,6 +1640,7 @@ DEBUG_SITE_HTML = """<!doctype html>
         path.addEventListener("click", () => {
           state.selectedRelationshipKey = relKey;
           drawEdges(state.currentRelationships, canvas, edgeLayer);
+          renderRelationshipInspector();
         });
         if (tooltipEl) {
           path.addEventListener("pointerenter", (event) => {
@@ -1544,8 +1908,12 @@ DEBUG_SITE_HTML = """<!doctype html>
       return expected;
     }
 
-    function renderGroundTruth() {
+    function renderRelationshipSummary() {
       const manifest = state.payload.manifest;
+      state.hasGroundTruth = Boolean(manifest);
+      configureModeOptions();
+      configureEdgeModeOptions();
+      configureEvaluationUI();
       const setRail = (id, items) => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = listHtml(items);
@@ -1555,69 +1923,72 @@ DEBUG_SITE_HTML = """<!doctype html>
         if (el) el.textContent = String(value);
       };
 
-      setMetric("covThreshold", state.threshold.toFixed(2));
+      setMetric("metricThreshold", state.threshold.toFixed(2));
       const predictedJoins = state.payload.report.joins || [];
       const predictedAtThreshold = predictedJoins.filter(
         (join) => Number(join.confidence || 0) >= state.threshold
       );
-      if (!manifest) {
-        const predictedMap = new Map();
-        predictedAtThreshold.forEach((join) => {
-          const left = `${join.left_table}.${join.left_column}`;
-          const right = `${join.right_table}.${join.right_column}`;
-          predictedMap.set(relationKey(left, right), joinDisplay(left, right));
-        });
-        setMetric("covExpected", 0);
-        setMetric("covPredicted", predictedMap.size);
-        setMetric("covFound", predictedMap.size);
-        setMetric("covMissing", 0);
-        setMetric("covUnexpected", 0);
-        setMetric("covRecall", "0.0%");
-        setMetric("covPrecision", "0.0%");
-        const noManifest = ["No manifest.json found in analyzed folder."];
-        setRail("joinsFoundList", predictedMap.size ? sortStrings(Array.from(predictedMap.values())) : noManifest);
-        setRail("missingJoinsList", noManifest);
-        setRail("unexpectedJoinsList", noManifest);
-        state.relationshipPool = buildRelationshipPool(new Map(), predictedAtThreshold, false);
-        return;
-      }
-
-      const ground = manifest.ground_truth || {};
-      const coreRelations = ground.core_relationships || ground.core_relationshpis || [];
-      const expectedMap = collectExpectedJoins(manifest, coreRelations);
-      state.relationshipPool = buildRelationshipPool(expectedMap, predictedAtThreshold, true);
       const predictedMap = new Map();
       predictedAtThreshold.forEach((join) => {
         const left = `${join.left_table}.${join.left_column}`;
         const right = `${join.right_table}.${join.right_column}`;
         predictedMap.set(relationKey(left, right), joinDisplay(left, right));
       });
-      const expectedKeys = new Set(expectedMap.keys());
-      const predictedKeys = new Set(predictedMap.keys());
-      const found = Array.from(expectedMap.entries())
-        .filter(([key]) => predictedKeys.has(key))
-        .map(([, info]) => info.display);
-      const missing = Array.from(expectedMap.entries())
-        .filter(([key]) => !predictedKeys.has(key))
-        .map(([, info]) => info.display);
-      const unexpected = Array.from(predictedMap.entries())
-        .filter(([key]) => !expectedKeys.has(key))
-        .map(([, label]) => label);
 
-      const recall = expectedMap.size === 0 ? 0 : found.length / expectedMap.size;
-      const precision = predictedMap.size === 0 ? 0 : found.length / predictedMap.size;
+      let found = [];
+      let missing = [];
+      let unexpected = [];
 
-      setMetric("covExpected", expectedMap.size);
-      setMetric("covPredicted", predictedMap.size);
-      setMetric("covFound", found.length);
-      setMetric("covMissing", missing.length);
-      setMetric("covUnexpected", unexpected.length);
-      setMetric("covRecall", `${(recall * 100).toFixed(1)}%`);
-      setMetric("covPrecision", `${(precision * 100).toFixed(1)}%`);
+      if (state.hasGroundTruth) {
+        const ground = manifest.ground_truth || {};
+        const coreRelations = ground.core_relationships || ground.core_relationshpis || [];
+        const expectedMap = collectExpectedJoins(manifest, coreRelations);
+        state.relationshipPool = buildRelationshipPool(expectedMap, predictedJoins, true);
+        const expectedKeys = new Set(expectedMap.keys());
+        const predictedKeys = new Set(predictedMap.keys());
+        found = Array.from(expectedMap.entries())
+          .filter(([key]) => predictedKeys.has(key))
+          .map(([, info]) => info.display);
+        missing = Array.from(expectedMap.entries())
+          .filter(([key]) => !predictedKeys.has(key))
+          .map(([, info]) => info.display);
+        unexpected = Array.from(predictedMap.entries())
+          .filter(([key]) => !expectedKeys.has(key))
+          .map(([, label]) => label);
+      } else {
+        state.relationshipPool = buildRelationshipPool(new Map(), predictedJoins, false);
+      }
 
-      setRail("joinsFoundList", sortStrings(found));
-      setRail("missingJoinsList", sortStrings(missing));
-      setRail("unexpectedJoinsList", sortStrings(unexpected));
+      if (isEvaluationOverlayActive()) {
+        setRail("joinsFoundList", sortStrings(found));
+        setRail("missingJoinsList", sortStrings(missing));
+        setRail("unexpectedJoinsList", sortStrings(unexpected));
+      } else {
+        const emptyState = ["No discovered relationships at current threshold."];
+        setRail(
+          "joinsFoundList",
+          predictedMap.size ? sortStrings(Array.from(predictedMap.values())) : emptyState
+        );
+        setRail("missingJoinsList", []);
+        setRail("unexpectedJoinsList", []);
+      }
+
+      const visible = activeRelationships();
+      const visibleScored = visible.filter((rel) => rel.category !== "missing");
+      const derivedCount = visibleScored.filter((rel) => Boolean(rel.derived)).length;
+      const avgConfidence = visibleScored.length
+        ? visibleScored.reduce((acc, rel) => acc + Number(rel.confidence || 0), 0) /
+          visibleScored.length
+        : 0;
+
+      setMetric("metricTables", state.payload.tables.length);
+      setMetric("metricVisible", visible.length);
+      setMetric("metricDerived", derivedCount);
+      setMetric("metricAvgConfidence", avgConfidence.toFixed(2));
+      setMetric("metricFound", found.length);
+      setMetric("metricMissing", missing.length);
+      setMetric("metricUnexpected", unexpected.length);
+      renderRelationshipInspector();
     }
 
     async function init() {
@@ -1632,10 +2003,22 @@ DEBUG_SITE_HTML = """<!doctype html>
       const slider = document.getElementById("confidenceRange");
       const label = document.getElementById("confidenceLabel");
       const searchInput = document.getElementById("tableSearch");
+      const modeToggle = document.getElementById("modeToggle");
       const edgeModeSelect = document.getElementById("edgeMode");
+      const relationshipTypeFilter = document.getElementById("relationshipTypeFilter");
+      const derivedFilter = document.getElementById("derivedFilter");
       const relayoutBtn = document.getElementById("relayoutBtn");
       const fitViewBtn = document.getElementById("fitViewBtn");
       const clearFilterBtn = document.getElementById("clearFilterBtn");
+      const sourcePath = String(state.payload?.meta?.source_path || "");
+      const sourceBase = sourcePath.replace(/\\\\/g, "/").split("/").filter(Boolean).pop() || sourcePath;
+      setText("datasetTitle", sourceBase || "Smartjoin Dataset");
+
+      state.hasGroundTruth = Boolean(state.payload.manifest);
+      configureModeOptions();
+      configureRelationshipTypeOptions();
+      configureEdgeModeOptions();
+      configureEvaluationUI();
       slider.value = String(state.payload.meta.min_confidence ?? 0.75);
       state.threshold = Number(slider.value);
       label.textContent = Number(slider.value).toFixed(2);
@@ -1643,21 +2026,43 @@ DEBUG_SITE_HTML = """<!doctype html>
         state.threshold = Number(slider.value);
         label.textContent = Number(slider.value).toFixed(2);
         state.selectedRelationshipKey = null;
-        renderGroundTruth();
+        renderRelationshipSummary();
+        renderTableList();
+        renderDiagram();
+      });
+      modeToggle.addEventListener("change", () => {
+        state.viewerMode = modeToggle.value || "discovered";
+        state.edgeMode = "all";
+        state.selectedRelationshipKey = null;
+        renderRelationshipSummary();
         renderTableList();
         renderDiagram();
       });
       searchInput.addEventListener("input", () => {
         state.tableQuery = searchInput.value || "";
         state.selectedRelationshipKey = null;
-        renderGroundTruth();
+        renderRelationshipSummary();
         renderTableList();
         renderDiagram();
       });
       edgeModeSelect.addEventListener("change", () => {
         state.edgeMode = edgeModeSelect.value || "all";
         state.selectedRelationshipKey = null;
-        renderGroundTruth();
+        renderRelationshipSummary();
+        renderDiagram();
+      });
+      relationshipTypeFilter.addEventListener("change", () => {
+        state.relationshipType = relationshipTypeFilter.value || "all";
+        state.selectedRelationshipKey = null;
+        renderRelationshipSummary();
+        renderTableList();
+        renderDiagram();
+      });
+      derivedFilter.addEventListener("change", () => {
+        state.derivedMode = derivedFilter.value || "both";
+        state.selectedRelationshipKey = null;
+        renderRelationshipSummary();
+        renderTableList();
         renderDiagram();
       });
       relayoutBtn.addEventListener("click", () => {
@@ -1671,10 +2076,15 @@ DEBUG_SITE_HTML = """<!doctype html>
       clearFilterBtn.addEventListener("click", () => {
         state.tableQuery = "";
         state.edgeMode = "all";
+        state.relationshipType = "all";
+        state.derivedMode = "both";
+        state.viewerMode = state.hasGroundTruth ? state.viewerMode : "discovered";
         state.selectedRelationshipKey = null;
         searchInput.value = "";
-        edgeModeSelect.value = "all";
-        renderGroundTruth();
+        modeToggle.value = state.viewerMode;
+        relationshipTypeFilter.value = "all";
+        derivedFilter.value = "both";
+        renderRelationshipSummary();
         renderTableList();
         renderDiagram();
       });
@@ -1685,7 +2095,7 @@ DEBUG_SITE_HTML = """<!doctype html>
         drawEdges(state.currentRelationships, canvas, edgeLayer);
       });
 
-      renderGroundTruth();
+      renderRelationshipSummary();
       renderTableList();
       renderTableSelect();
       autoLayoutTables();

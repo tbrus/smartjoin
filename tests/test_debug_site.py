@@ -33,14 +33,20 @@ def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
     html = index_path.read_text(encoding="utf-8")
     assert "smartjoinEmbeddedData" in html
     assert "__SMARTJOIN_EMBEDDED_DATA__" not in html
-    assert "covRecall" in html
-    assert "covPrecision" in html
+    assert "modeToggle" in html
+    assert "relationshipTypeFilter" in html
+    assert "derivedFilter" in html
+    assert "metricAvgConfidence" in html
     assert "joinsFoundList" in html
     assert "missingJoinsList" in html
     assert "unexpectedJoinsList" in html
-    assert "Joins Found" in html
+    assert "relationshipInspector" in html
+    assert "Discovered Joins" in html
     assert "Missing Joins" in html
     assert "Unexpected Joins" in html
+    assert "All discovered" in html
+    assert "Discovered Join" in html
+    assert "No manifest.json found. Showing discovered relationships only." in html
     assert "edge-unknown" in html
     assert "attachDrag" in html
     assert "derived?.description" in html
