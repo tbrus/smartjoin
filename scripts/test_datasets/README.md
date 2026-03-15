@@ -1,81 +1,49 @@
-# Test Dataset Generators
+# Test Datasets Generators
 
-This folder contains generation-only dataset builders used for Smartjoin testing.
+This folder contains **deterministic synthethic datasets generatorsused for smartjoin testing**.
 
-## Structure
+## Quickstart
 
-- `run.py`: unified CLI for generating one domain or all domains
-- `common/`: shared helper utilities and constants
-- `domains/retail.py`: retail/order-centric generator
-- `domains/health.py`: healthcare claims/encounters generator
-- `domains/saas.py`: SaaS billing/events generator
-- `domains/derived.py`: focused derived-key regression scenarios
-
-## Quick Start
-
-```bash
-python scripts/test_datasets/run.py --output-dir test_datasets
-python scripts/test_datasets/run.py --pct-derived-keys 0.5 --pct-derived-both-sides 0.25 --output-dir test_datasets
-python scripts/test_datasets/run.py --domain retail --output-dir test_datasets
-python scripts/test_datasets/run.py --domain derived --output-dir test_datasets
-python scripts/test_datasets/run.py --domain saas --seed 42 --output-dir test_datasets
-smartjoin generate-test-datasets --output-dir test_datasets
-smartjoin generate-test-datasets --pct-derived-keys 0.5 --pct-derived-both-sides 0.25 --output-dir test_datasets
-smartjoin generate-test-datasets --domain retail --output-dir test_datasets
-smartjoin generate-test-datasets --domain derived --output-dir test_datasets
+```
+smartjoin generate-test-datasets --output-dir <output-dir>
 ```
 
-Outputs are written under `<output-dir>/<domain>/`, including `manifest.json` and generated input files.
-By default, domain tables are emitted in mixed formats so each dataset includes a blend of:
+## Output
 
-- `.csv`
-- `.json`
-- `.parquet`
-- `.xlsx`
-
-## Explicit Common Flags
-
-`run.py` now exposes common generation flags directly:
-
-- `--profile`, `--seed`, `--clean`
-- `--pct-missing`, `--pct-duplicates`, `--pct-dirty-keys`
-- `--pct-derived-keys`, `--pct-derived-both-sides`
-- `--pct-inconsistent-types`
-- `--include-json`, `--max-json-records`
-
-These common flags work with both:
-
-- all domains (omit `--domain`)
-- one selected domain (`--domain retail|health|saas|derived`)
-
-Domain-specific size overrides are still supported by forwarding unknown flags when `--domain` is set.
-
-Example:
-
-```bash
-python scripts/test_datasets/run.py --domain retail --profile tiny --n-orders 500 --output-dir test_datasets
 ```
+<output-dir>
+    generation_manifest.json      # generation config: domains, output paths, seed, profiles
+    retail/                       # order-centric data with customers, products, orders, payments, shipments, etc.
+    health/                       # healthcare-style data with patients, providers, facilities, payers, etc.
+    saas/                         # subscription and billing-style data with accounts, users, workspaces, invoices, etc.
+    derived/                      # focused derived-key testing scenario
+```
+
+Each domain writes a `manifest.json` describing:
+- generator/config used
+- row counts
+- expected joins
+- trap columns
+- ground-truth relationships
+
+The generated tables may be written in mixed formats: `.csv`, `.json`, `.parquet`, `.xlsx`.
+
+## Common General Flags
+
+- `--domain retail|health|saas`
+- `--output-dir PATH`
+- `--seed INT`
+- `--profile tiny|small|medium|large`
+- `--clean`
+
+## Common Data Quality Flags
+- `--pct-missing FLOAT`
+- `--pct-duplicates FLOAT`
+- `--pct-dirty-keys FLOAT`
+- `--pct-derived-keys FLOAT`
+- `--pct-derived-both-sides FLOAT`
+- `--pct-inconsistent-types FLOAT`
 
 ## Notes
-
-- Generation only: no Smartjoin analysis, evaluation scoring, or debug site output.
-- Deterministic behavior is preserved via explicit seeds.
-- Each domain writes `manifest.json`.
-- Legacy per-domain `README.md` files are removed on generation.
-- Manifest creation is centralized in `common/manifest.py` to avoid per-domain duplication.
-
-## Manifest Schema
-
-All domain manifests now share the same top-level shape:
-
-- `generator`, `config`, `row_counts`
-- `expected_joins`
-- `trap_columns`
-- `ground_truth`
-
-`ground_truth` includes a normalized key set across domains:
-
-- `core_tables`, `core_relationships`, `composite_key_candidates`, `traps`
-- `guard_expectations`, `regression_cases`
-
-Some fields are intentionally empty in domains where they do not apply.
+- `manifest.json` exposes core relationships and trap columns enabling accuracy checks
+- data quality flags help creating "more difficult" datasets to analyze
