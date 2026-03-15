@@ -7,8 +7,9 @@ from pathlib import Path
 from smartjoin.config import (
     DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
     DEFAULT_NEAR_UNIQUE_THRESHOLD,
-    DERIVED_JOINS_ENABLED,
+    DEFAULT_RETENTION_CONFIDENCE_FLOOR,
     DERIVED_CONF_MULT,
+    DERIVED_JOINS_ENABLED,
     DERIVED_MAX_AMBIGUOUS_TARGETS,
     DERIVED_MAX_COLUMNS_PER_TABLE,
     DERIVED_MAX_TRANSFORMS_PER_COLUMN,
@@ -48,11 +49,14 @@ def analyze_path(
     derived_conf_mult: float = DERIVED_CONF_MULT,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
+    retention_confidence_floor: float = DEFAULT_RETENTION_CONFIDENCE_FLOOR,
 ) -> AnalysisReport:
     """Run ingestion + profiling + key discovery + join discovery + graph build."""
     resolved_top_k_edges = top_k_edges if top_k_edges is not None else graph_top_k_per_pair
+    resolved_retention_floor = max(0.0, min(1.0, float(retention_confidence_floor)))
     settings = AnalysisSettings(
         min_confidence=min_confidence,
+        retention_confidence_floor=resolved_retention_floor,
         top_k_edges=max(1, resolved_top_k_edges),
         sample_rows=sample_rows,
         sample_seed=sample_seed,
@@ -90,7 +94,7 @@ def analyze_path(
         tables=tables,
         sample_rows=settings.sample_rows,
         sample_seed=settings.sample_seed,
-        min_confidence=settings.min_confidence,
+        retention_confidence_floor=settings.retention_confidence_floor,
         weights=join_weights,
         near_unique_threshold=settings.near_unique_threshold,
         distinct_low_card_threshold=settings.distinct_low_card_threshold,
@@ -148,6 +152,7 @@ def build_graph_report(
     derived_conf_mult: float = DERIVED_CONF_MULT,
     fast_profile: bool = False,
     profile_entropy_cap: int = 50_000,
+    retention_confidence_floor: float = DEFAULT_RETENTION_CONFIDENCE_FLOOR,
 ) -> JoinGraphReport:
     """Build only join graph output for CLI graph command."""
     report = analyze_path(
@@ -173,6 +178,7 @@ def build_graph_report(
         derived_conf_mult=derived_conf_mult,
         fast_profile=fast_profile,
         profile_entropy_cap=profile_entropy_cap,
+        retention_confidence_floor=retention_confidence_floor,
     )
     return report.graph
 

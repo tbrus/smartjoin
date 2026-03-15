@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 DEFAULT_MIN_CONFIDENCE = 0.8
+DEFAULT_RETENTION_CONFIDENCE_FLOOR = 0.0
 DEFAULT_TOP_K_EDGES = 3
 DEFAULT_SAMPLE_ROWS = 10_000
 DEFAULT_SAMPLE_SEED = 42
@@ -40,6 +41,7 @@ class AnalysisSettings:
     """Canonical runtime knobs for analysis and reporting."""
 
     min_confidence: float = DEFAULT_MIN_CONFIDENCE
+    retention_confidence_floor: float = DEFAULT_RETENTION_CONFIDENCE_FLOOR
     top_k_edges: int = DEFAULT_TOP_K_EDGES
     sample_rows: int = DEFAULT_SAMPLE_ROWS
     sample_seed: int = DEFAULT_SAMPLE_SEED
@@ -57,6 +59,7 @@ class AnalysisSettings:
         """Serialize as JSON-safe dict for `AnalysisReport.settings`."""
         return {
             "min_confidence": float(self.min_confidence),
+            "retention_confidence_floor": float(self.retention_confidence_floor),
             "top_k_edges": int(self.top_k_edges),
             "sample_rows": int(self.sample_rows),
             "sample_seed": int(self.sample_seed),

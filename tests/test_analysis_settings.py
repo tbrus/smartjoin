@@ -28,6 +28,7 @@ def test_analysis_report_includes_settings_dump(tmp_path: Path) -> None:
     )
 
     assert report.settings.min_confidence == 0.67
+    assert report.settings.retention_confidence_floor == 0.0
     assert report.settings.top_k_edges == 2
     assert report.settings.sample_rows == 123
     assert report.settings.sample_seed == 9

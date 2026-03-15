@@ -136,6 +136,7 @@ class AnalysisSettingsReport(BaseModel):
     """Settings snapshot used to generate a report."""
 
     min_confidence: float = Field(ge=0.0, le=1.0)
+    retention_confidence_floor: float = Field(default=0.0, ge=0.0, le=1.0)
     top_k_edges: int = Field(ge=1)
     sample_rows: int = Field(ge=1)
     sample_seed: int = Field(ge=0)

@@ -233,6 +233,9 @@ def _build_payload(
             "sample_rows": sample_rows,
             "sample_seed": sample_seed,
             "min_confidence": min_confidence,
+            "retention_confidence_floor": report_payload.get("settings", {}).get(
+                "retention_confidence_floor"
+            ),
             "graph_top_k_per_pair": graph_top_k_per_pair,
             "distinct_low_card_threshold": distinct_low_card_threshold,
             "near_unique_threshold": near_unique_threshold,

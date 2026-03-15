@@ -21,8 +21,8 @@ from smartjoin.config import (
 from smartjoin.joins.derived import (
     DerivedBudgets,
     DerivedCandidate,
-    detect_dominant_value_prefix,
     derive_candidates_for_column,
+    detect_dominant_value_prefix,
     entity_cores_compatible,
     normalize_transformed_value_for_signature,
     rank_derived_source_columns,
@@ -955,7 +955,9 @@ def _drop_dominated_noncanonical_targets(
         by_right_col = {candidate.right_column: candidate for candidate in group_candidates}
         for candidate in group_candidates:
             pk_sig = signatures[(candidate.right_table, candidate.right_column)]
-            winner = table_identifier_winners.get((pk_sig.table_name, pk_sig.name_features.entity_core))
+            winner = table_identifier_winners.get(
+                (pk_sig.table_name, pk_sig.name_features.entity_core)
+            )
             if winner is None:
                 kept.append(candidate)
                 continue
@@ -1062,7 +1064,7 @@ def _score_candidate(
     type_score: float,
     normalized_weights: dict[str, float],
     effective_date_caps: dict[str, float],
-    min_confidence: float,
+    retention_confidence_floor: float,
     identifier_hubs: dict[str, tuple[str, str]],
     table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
     bridge_tables: set[str],
@@ -1145,7 +1147,7 @@ def _score_candidate(
     confidence = min(confidence, date_cap)
     if derived is not None:
         confidence *= derived_conf_mult
-    if confidence < min_confidence:
+    if confidence < retention_confidence_floor:
         return None
 
     return JoinCandidate(
@@ -1208,10 +1210,26 @@ def find_join_candidates(
     derived_max_ambiguous_targets: int = DERIVED_MAX_AMBIGUOUS_TARGETS,
     derived_conf_mult: float = DERIVED_CONF_MULT,
     signature_cache: SignatureCache | None = None,
+    retention_confidence_floor: float | None = None,
 ) -> list[JoinCandidate]:
-    """Find join candidates using cached column signatures."""
+    """Find join candidates using cached column signatures.
+
+    `min_confidence` is preserved for backward compatibility and is treated as the
+    retention floor unless `retention_confidence_floor` is explicitly provided.
+    """
     normalized_weights = _normalize_weights(weights)
     effective_derived_conf_mult = max(0.0, min(1.0, float(derived_conf_mult)))
+    resolved_retention_floor = max(
+        0.0,
+        min(
+            1.0,
+            float(
+                min_confidence
+                if retention_confidence_floor is None
+                else retention_confidence_floor
+            ),
+        ),
+    )
     effective_date_caps = merge_date_caps(date_caps)
     signatures = signature_cache or build_column_signatures(
         tables=tables,
@@ -1322,7 +1340,7 @@ def find_join_candidates(
                         type_score=type_score,
                         normalized_weights=normalized_weights,
                         effective_date_caps=effective_date_caps,
-                        min_confidence=min_confidence,
+                        retention_confidence_floor=resolved_retention_floor,
                         identifier_hubs=identifier_hubs,
                         table_identifier_winners=table_identifier_winners,
                         bridge_tables=bridge_tables,
@@ -1420,7 +1438,7 @@ def find_join_candidates(
                             type_score=type_score,
                             normalized_weights=normalized_weights,
                             effective_date_caps=effective_date_caps,
-                            min_confidence=min_confidence,
+                            retention_confidence_floor=resolved_retention_floor,
                             identifier_hubs=identifier_hubs,
                             table_identifier_winners=table_identifier_winners,
                             bridge_tables=bridge_tables,
@@ -1508,7 +1526,7 @@ def find_join_candidates(
                             type_score=type_score,
                             normalized_weights=normalized_weights,
                             effective_date_caps=effective_date_caps,
-                            min_confidence=min_confidence,
+                            retention_confidence_floor=resolved_retention_floor,
                             identifier_hubs=identifier_hubs,
                             table_identifier_winners=table_identifier_winners,
                             bridge_tables=bridge_tables,
@@ -1528,7 +1546,9 @@ def find_join_candidates(
                         candidate.right_column,
                     )
                     current = best_candidates.get(key)
-                    if current is None or _should_replace_candidate(current=current, incoming=candidate):
+                    if current is None or _should_replace_candidate(
+                        current=current, incoming=candidate
+                    ):
                         best_candidates[key] = candidate
 
     final_candidates = _dedupe_temporal_equivalent_targets(
