@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -44,8 +45,8 @@ def discover_data_files(path: Path, max_tables: int | None = None) -> list[Path]
         return [path]
 
     files = sorted(
-        [p for p in path.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS],
-        key=lambda p: p.name.lower(),
+        [p for p in path.rglob("*") if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS],
+        key=lambda p: str(p.relative_to(path)).lower(),
     )
     if max_tables is not None:
         files = files[:max_tables]
@@ -60,21 +61,17 @@ def _load_parquet(path: Path) -> pl.DataFrame:
     return pl.read_parquet(path)
 
 
-def _load_xlsx(path: Path, sheet_name: str | None = None) -> pl.DataFrame:
-    try:
-        import pandas as pd
-    except ImportError as exc:  # pragma: no cover - handled via runtime dependency
-        raise ValueError("XLSX support requires pandas/openpyxl installed.") from exc
+def _normalize_pandas_frame(frame: Any) -> pl.DataFrame:
+    """Normalize a pandas DataFrame for stable Polars ingestion."""
+    import pandas as pd
 
-    target_sheet = sheet_name if sheet_name is not None else 0
-    frame = pd.read_excel(path, sheet_name=target_sheet)
-    # Excel sheets often contain mixed-type object columns (text + blanks + temporal values).
-    # Build columns explicitly and coerce ambiguous object/temporal data to string for stability.
     normalized: dict[str, list[Any]] = {}
     for col_name in frame.columns:
         series = frame[col_name].where(frame[col_name].notna(), None)
         values = series.tolist()
-        if pd.api.types.is_datetime64_any_dtype(series) or pd.api.types.is_timedelta64_dtype(series):
+        if pd.api.types.is_datetime64_any_dtype(series) or pd.api.types.is_timedelta64_dtype(
+            series
+        ):
             normalized[col_name] = [None if value is None else str(value) for value in values]
             continue
         if pd.api.types.is_object_dtype(series):
@@ -84,6 +81,27 @@ def _load_xlsx(path: Path, sheet_name: str | None = None) -> pl.DataFrame:
                 continue
         normalized[col_name] = values
     return pl.DataFrame(normalized, strict=False)
+
+
+def _load_xlsx(path: Path, sheet_name: str | None = None) -> list[tuple[str, pl.DataFrame]]:
+    try:
+        import pandas as pd
+    except ImportError as exc:  # pragma: no cover - handled via runtime dependency
+        raise ValueError("XLSX support requires pandas/openpyxl installed.") from exc
+
+    # No explicit sheet means read all workbook sheets.
+    target_sheet: str | None = sheet_name if sheet_name is not None else None
+    loaded = pd.read_excel(path, sheet_name=target_sheet)
+    if isinstance(loaded, dict):
+        return [(str(name), _normalize_pandas_frame(frame)) for name, frame in loaded.items()]
+    resolved = str(sheet_name if sheet_name is not None else 0)
+    return [(resolved, _normalize_pandas_frame(loaded))]
+
+
+def _sanitize_sheet_name(sheet_name: str) -> str:
+    token = re.sub(r"[^A-Za-z0-9_]+", "_", sheet_name.strip())
+    token = re.sub(r"_+", "_", token).strip("_")
+    return token or "sheet"
 
 
 def _load_json(path: Path, flatten_depth: int = 1) -> pl.DataFrame:
@@ -133,17 +151,40 @@ def load_tables(
 
         if suffix == ".csv":
             df = _load_csv(file_path)
+            table_name = file_path.stem
         elif suffix == ".parquet":
             df = _load_parquet(file_path)
+            table_name = file_path.stem
         elif suffix == ".xlsx":
-            sheet_name = None
+            requested_sheet = None
             if xlsx_sheet_map and file_path.name in xlsx_sheet_map:
-                sheet_name = xlsx_sheet_map[file_path.name]
-            metadata["sheet"] = sheet_name or 0
-            df = _load_xlsx(file_path, sheet_name=sheet_name)
+                requested_sheet = xlsx_sheet_map[file_path.name]
+            sheet_frames = _load_xlsx(file_path, sheet_name=requested_sheet)
+            use_sheet_suffix = requested_sheet is None and len(sheet_frames) > 1
+            for sheet, sheet_df in sheet_frames:
+                sheet_meta = dict(metadata)
+                sheet_meta["sheet"] = sheet
+                if max_columns is not None:
+                    selected_cols = sheet_df.columns[:max_columns]
+                    sheet_df = sheet_df.select(selected_cols)
+                    sheet_meta["max_columns_applied"] = max_columns
+                sheet_suffix = _sanitize_sheet_name(sheet)
+                table_name = (
+                    f"{file_path.stem}__{sheet_suffix}" if use_sheet_suffix else file_path.stem
+                )
+                tables.append(
+                    Table(
+                        name=table_name,
+                        df=sheet_df,
+                        path=file_path,
+                        metadata=sheet_meta,
+                    )
+                )
+            continue
         elif suffix == ".json":
             metadata["flatten_depth"] = json_flatten_depth
             df = _load_json(file_path, flatten_depth=json_flatten_depth)
+            table_name = file_path.stem
         else:  # pragma: no cover
             continue
 
@@ -154,7 +195,7 @@ def load_tables(
 
         tables.append(
             Table(
-                name=file_path.stem,
+                name=table_name,
                 df=df,
                 path=file_path,
                 metadata=metadata,

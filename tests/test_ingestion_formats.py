@@ -39,4 +39,61 @@ def test_load_tables_supports_xlsx(tmp_path: Path) -> None:
     by_name = {table.name: table for table in tables}
     assert "book" in by_name
     assert by_name["book"].metadata["format"] == "xlsx"
+    assert by_name["book"].metadata["sheet"] == "Data"
     assert by_name["book"].df.height == 2
+
+
+def test_load_tables_scans_supported_files_recursively(tmp_path: Path) -> None:
+    nested = tmp_path / "a" / "b"
+    nested.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({"id": [1, 2]}).write_csv(nested / "nested.csv")
+    pl.DataFrame({"id": [3, 4]}).write_parquet(tmp_path / "top.parquet")
+
+    tables = load_tables(tmp_path)
+    by_name = {table.name: table for table in tables}
+
+    assert "nested" in by_name
+    assert "top" in by_name
+
+
+def test_load_tables_reads_all_xlsx_sheets_by_default(tmp_path: Path) -> None:
+    pd = pytest.importorskip("pandas")
+    pytest.importorskip("openpyxl")
+
+    xlsx_path = tmp_path / "multi.xlsx"
+    with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+        pd.DataFrame({"id": [1], "region": ["R01"]}).to_excel(
+            writer,
+            index=False,
+            sheet_name="Data",
+        )
+        pd.DataFrame({"id": [2], "status": ["active"]}).to_excel(
+            writer,
+            index=False,
+            sheet_name="Archive Rows",
+        )
+
+    tables = load_tables(tmp_path)
+    by_name = {table.name: table for table in tables}
+
+    assert "multi__Data" in by_name
+    assert "multi__Archive_Rows" in by_name
+    assert by_name["multi__Data"].metadata["sheet"] == "Data"
+    assert by_name["multi__Archive_Rows"].metadata["sheet"] == "Archive Rows"
+
+
+def test_load_tables_xlsx_sheet_map_selects_single_sheet(tmp_path: Path) -> None:
+    pd = pytest.importorskip("pandas")
+    pytest.importorskip("openpyxl")
+
+    xlsx_path = tmp_path / "multi.xlsx"
+    with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+        pd.DataFrame({"id": [1]}).to_excel(writer, index=False, sheet_name="Data")
+        pd.DataFrame({"id": [2]}).to_excel(writer, index=False, sheet_name="Archive")
+
+    tables = load_tables(tmp_path, xlsx_sheet_map={"multi.xlsx": "Archive"})
+    by_name = {table.name: table for table in tables}
+
+    assert set(by_name.keys()) == {"multi"}
+    assert by_name["multi"].metadata["sheet"] == "Archive"
+    assert by_name["multi"].df.to_dicts() == [{"id": 2}]
