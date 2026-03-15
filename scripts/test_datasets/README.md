@@ -1,6 +1,6 @@
 # Test Datasets Generators
 
-This folder contains **deterministic synthethic datasets generatorsused for smartjoin testing**.
+This folder contains **deterministic synthethic datasets generators used for smartjoin testing**.
 
 ## Quickstart
 
