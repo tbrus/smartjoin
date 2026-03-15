@@ -102,42 +102,11 @@ class JoinCandidate(BaseModel):
     derived: DerivedTransform | None = None
 
 
-class JoinGraphNode(BaseModel):
-    """Join graph node."""
-
-    table_name: str
-    row_count: int = Field(ge=0)
-
-
-class JoinGraphEdge(BaseModel):
-    """Join graph edge."""
-
-    left_table: str
-    right_table: str
-    left_column: str
-    right_column: str
-    edge_group_id: str
-    edge_rank: int = Field(ge=1)
-    confidence: float = Field(ge=0.0, le=1.0)
-    relationship_guess: str
-    derived: DerivedTransform | None = None
-
-
-class JoinGraphReport(BaseModel):
-    """Serializable join graph report."""
-
-    top_k_per_pair: int = Field(ge=1)
-    min_confidence: float = Field(ge=0.0, le=1.0)
-    nodes: list[JoinGraphNode]
-    edges: list[JoinGraphEdge]
-
-
 class AnalysisSettingsReport(BaseModel):
     """Settings snapshot used to generate a report."""
 
     min_confidence: float = Field(ge=0.0, le=1.0)
     retention_confidence_floor: float = Field(default=0.0, ge=0.0, le=1.0)
-    top_k_edges: int = Field(ge=1)
     sample_rows: int = Field(ge=1)
     sample_seed: int = Field(ge=0)
     distinct_low_card_threshold: int = Field(ge=1)
@@ -159,4 +128,3 @@ class AnalysisReport(BaseModel):
     tables: list[TableProfile]
     keys: list[TableKeyDiscovery]
     joins: list[JoinCandidate]
-    graph: JoinGraphReport

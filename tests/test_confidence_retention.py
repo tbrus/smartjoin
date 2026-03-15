@@ -3,8 +3,7 @@ from pathlib import Path
 import polars as pl
 
 from smartjoin.analysis import analyze_path
-from smartjoin.graphing import build_join_graph, graph_to_report
-from smartjoin.ingestion import load_tables
+from smartjoin.models import AnalysisReport
 
 
 def _edge_endpoints(
@@ -43,6 +42,14 @@ def _write_confidence_fixture(path: Path) -> None:
     orders.write_csv(path / "orders.csv")
 
 
+def _visible_edges(report: AnalysisReport, threshold: float) -> set[tuple[str, str]]:
+    joins = [join for join in report.joins if join.confidence >= threshold]
+    return {
+        _edge_endpoints(join.left_table, join.left_column, join.right_table, join.right_column)
+        for join in joins
+    }
+
+
 def test_analysis_keeps_lower_confidence_candidates_for_internal_retention(
     tmp_path: Path,
 ) -> None:
@@ -54,7 +61,6 @@ def test_analysis_keeps_lower_confidence_candidates_for_internal_retention(
         path=data_dir,
         sample_rows=5_000,
         min_confidence=0.8,
-        top_k_edges=10,
     )
 
     low_confidence = [
@@ -66,7 +72,8 @@ def test_analysis_keeps_lower_confidence_candidates_for_internal_retention(
         == ("customers.created_date", "orders.created_date")
         for join in low_confidence
     )
-    assert all(edge.confidence >= report.settings.min_confidence for edge in report.graph.edges)
+    visible_edges = _visible_edges(report, report.settings.min_confidence)
+    assert ("customers.created_date", "orders.created_date") not in visible_edges
 
 
 def test_lowering_visible_threshold_exposes_more_edges_without_rerunning_discovery(
@@ -80,33 +87,9 @@ def test_lowering_visible_threshold_exposes_more_edges_without_rerunning_discove
         path=data_dir,
         sample_rows=5_000,
         min_confidence=0.8,
-        top_k_edges=10,
     )
-    tables = load_tables(data_dir)
-
-    high_graph = build_join_graph(
-        tables=tables,
-        joins=report.joins,
-        min_confidence=0.8,
-        top_k_per_pair=10,
-    )
-    high_report = graph_to_report(high_graph, top_k_per_pair=10, min_confidence=0.8)
-    low_graph = build_join_graph(
-        tables=tables,
-        joins=report.joins,
-        min_confidence=0.6,
-        top_k_per_pair=10,
-    )
-    low_report = graph_to_report(low_graph, top_k_per_pair=10, min_confidence=0.6)
-
-    high_edges = {
-        _edge_endpoints(edge.left_table, edge.left_column, edge.right_table, edge.right_column)
-        for edge in high_report.edges
-    }
-    low_edges = {
-        _edge_endpoints(edge.left_table, edge.left_column, edge.right_table, edge.right_column)
-        for edge in low_report.edges
-    }
+    high_edges = _visible_edges(report, 0.8)
+    low_edges = _visible_edges(report, 0.6)
 
     assert high_edges.issubset(low_edges)
     assert len(low_edges) > len(high_edges)

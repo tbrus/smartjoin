@@ -18,11 +18,10 @@ from smartjoin.config import (
     merge_date_caps,
 )
 from smartjoin.exporters import build_sql_skeleton
-from smartjoin.graphing import build_join_graph, graph_to_report
 from smartjoin.ingestion import load_tables
 from smartjoin.joins import find_join_candidates
 from smartjoin.keys import discover_keys
-from smartjoin.models import AnalysisReport, AnalysisSettingsReport, JoinGraphReport
+from smartjoin.models import AnalysisReport, AnalysisSettingsReport
 from smartjoin.profiling import profile_tables
 
 
@@ -36,8 +35,6 @@ def analyze_path(
     join_weights: dict[str, float] | None = None,
     xlsx_sheet_map: dict[str, str] | None = None,
     json_flatten_depth: int = 1,
-    graph_top_k_per_pair: int = 3,
-    top_k_edges: int | None = None,
     distinct_low_card_threshold: int = DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
     near_unique_threshold: float = DEFAULT_NEAR_UNIQUE_THRESHOLD,
     date_caps: dict[str, float] | None = None,
@@ -51,13 +48,11 @@ def analyze_path(
     profile_entropy_cap: int = 50_000,
     retention_confidence_floor: float = DEFAULT_RETENTION_CONFIDENCE_FLOOR,
 ) -> AnalysisReport:
-    """Run ingestion + profiling + key discovery + join discovery + graph build."""
-    resolved_top_k_edges = top_k_edges if top_k_edges is not None else graph_top_k_per_pair
+    """Run ingestion + profiling + key discovery + join discovery."""
     resolved_retention_floor = max(0.0, min(1.0, float(retention_confidence_floor)))
     settings = AnalysisSettings(
         min_confidence=min_confidence,
         retention_confidence_floor=resolved_retention_floor,
-        top_k_edges=max(1, resolved_top_k_edges),
         sample_rows=sample_rows,
         sample_seed=sample_seed,
         distinct_low_card_threshold=distinct_low_card_threshold,
@@ -107,80 +102,13 @@ def analyze_path(
         derived_conf_mult=settings.derived_conf_mult,
     )
 
-    graph = build_join_graph(
-        tables=tables,
-        joins=joins,
-        min_confidence=settings.min_confidence,
-        top_k_per_pair=settings.top_k_edges,
-    )
-    graph_report = graph_to_report(
-        graph=graph,
-        top_k_per_pair=settings.top_k_edges,
-        min_confidence=settings.min_confidence,
-    )
-
     return AnalysisReport(
         source_path=str(path.resolve()),
         settings=AnalysisSettingsReport.model_validate(settings.to_report_dict()),
         tables=table_profiles,
         keys=keys,
         joins=joins,
-        graph=graph_report,
     )
-
-
-def build_graph_report(
-    path: Path,
-    min_confidence: float = 0.8,
-    sample_rows: int = 10_000,
-    sample_seed: int = 42,
-    max_tables: int | None = None,
-    max_columns: int | None = None,
-    join_weights: dict[str, float] | None = None,
-    xlsx_sheet_map: dict[str, str] | None = None,
-    json_flatten_depth: int = 1,
-    graph_top_k_per_pair: int = 3,
-    top_k_edges: int | None = None,
-    distinct_low_card_threshold: int = DEFAULT_DISTINCT_LOW_CARD_THRESHOLD,
-    near_unique_threshold: float = DEFAULT_NEAR_UNIQUE_THRESHOLD,
-    date_caps: dict[str, float] | None = None,
-    derived_joins_enabled: bool = DERIVED_JOINS_ENABLED,
-    derived_max_transforms_per_column: int = DERIVED_MAX_TRANSFORMS_PER_COLUMN,
-    derived_max_columns_per_table: int = DERIVED_MAX_COLUMNS_PER_TABLE,
-    derived_min_distinct: int = DERIVED_MIN_DISTINCT,
-    derived_max_ambiguous_targets: int = DERIVED_MAX_AMBIGUOUS_TARGETS,
-    derived_conf_mult: float = DERIVED_CONF_MULT,
-    fast_profile: bool = False,
-    profile_entropy_cap: int = 50_000,
-    retention_confidence_floor: float = DEFAULT_RETENTION_CONFIDENCE_FLOOR,
-) -> JoinGraphReport:
-    """Build only join graph output for CLI graph command."""
-    report = analyze_path(
-        path=path,
-        sample_rows=sample_rows,
-        sample_seed=sample_seed,
-        max_tables=max_tables,
-        max_columns=max_columns,
-        min_confidence=min_confidence,
-        join_weights=join_weights,
-        xlsx_sheet_map=xlsx_sheet_map,
-        json_flatten_depth=json_flatten_depth,
-        graph_top_k_per_pair=graph_top_k_per_pair,
-        top_k_edges=top_k_edges,
-        distinct_low_card_threshold=distinct_low_card_threshold,
-        near_unique_threshold=near_unique_threshold,
-        date_caps=date_caps,
-        derived_joins_enabled=derived_joins_enabled,
-        derived_max_transforms_per_column=derived_max_transforms_per_column,
-        derived_max_columns_per_table=derived_max_columns_per_table,
-        derived_min_distinct=derived_min_distinct,
-        derived_max_ambiguous_targets=derived_max_ambiguous_targets,
-        derived_conf_mult=derived_conf_mult,
-        fast_profile=fast_profile,
-        profile_entropy_cap=profile_entropy_cap,
-        retention_confidence_floor=retention_confidence_floor,
-    )
-    return report.graph
 
 
 def export_sql(

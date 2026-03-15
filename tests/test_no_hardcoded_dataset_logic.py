@@ -11,7 +11,6 @@ def test_core_inference_modules_do_not_embed_dataset_table_names() -> None:
         root / "src" / "smartjoin" / "joins" / "discovery.py",
         root / "src" / "smartjoin" / "keys" / "discovery.py",
         root / "src" / "smartjoin" / "profiling" / "profiler.py",
-        root / "src" / "smartjoin" / "graphing.py",
     ]
     forbidden_tokens = [
         "customers",

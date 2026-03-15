@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 import typer
 
-from smartjoin.analysis import analyze_path, build_graph_report, export_sql
+from smartjoin.analysis import analyze_path, export_sql
 from smartjoin.debug_site import build_debug_site
 
 app = typer.Typer(help="Smartjoin: deterministic relational inference engine.")
@@ -105,15 +105,6 @@ def analyze_command(
         float,
         typer.Option(min=0.0, max=1.0, help="Minimum confidence threshold for joins."),
     ] = 0.8,
-    top_k_edges: Annotated[
-        int,
-        typer.Option(
-            "--top-k-edges",
-            "--graph-top-k-per-pair",
-            min=1,
-            help="Top K join edges retained per table pair in graph output.",
-        ),
-    ] = 3,
     distinct_low_card_threshold: Annotated[
         int,
         typer.Option(min=1, help="Distinct-count threshold used for low-cardinality trap guard."),
@@ -170,7 +161,6 @@ def analyze_command(
         max_tables=max_tables,
         max_columns=max_columns,
         min_confidence=min_confidence,
-        top_k_edges=top_k_edges,
         distinct_low_card_threshold=distinct_low_card_threshold,
         near_unique_threshold=near_unique_threshold,
         date_caps=_parse_float_assignments_csv(date_caps, label="date-caps"),
@@ -188,112 +178,6 @@ def analyze_command(
 
     out.write_text(rendered, encoding="utf-8")
     typer.echo(f"Wrote report: {out}")
-
-
-@app.command("graph")
-def graph_command(
-    path: Annotated[Path, typer.Argument(..., exists=True, readable=True, resolve_path=True)],
-    out: Annotated[
-        Path | None,
-        typer.Option(help="Optional output graph JSON path."),
-    ] = None,
-    min_confidence: Annotated[
-        float,
-        typer.Option(min=0.0, max=1.0, help="Minimum confidence threshold for graph edges."),
-    ] = 0.8,
-    top_k_edges: Annotated[
-        int,
-        typer.Option(
-            "--top-k-edges",
-            "--graph-top-k-per-pair",
-            min=1,
-            help="Top K join edges retained per table pair.",
-        ),
-    ] = 3,
-    sample_rows: Annotated[
-        int,
-        typer.Option(min=1, help="Rows sampled per column for join inference."),
-    ] = 10_000,
-    sample_seed: Annotated[
-        int,
-        typer.Option(help="Deterministic seed used for row sampling."),
-    ] = 42,
-    max_tables: Annotated[
-        int | None,
-        typer.Option(min=1, help="Maximum files to analyze."),
-    ] = None,
-    max_columns: Annotated[
-        int | None,
-        typer.Option(min=1, help="Maximum columns per table to consider."),
-    ] = None,
-    distinct_low_card_threshold: Annotated[
-        int,
-        typer.Option(min=1, help="Distinct-count threshold used for low-cardinality trap guard."),
-    ] = 64,
-    near_unique_threshold: Annotated[
-        float,
-        typer.Option(
-            min=0.0,
-            max=1.0,
-            help="Near-unique threshold used in profiling, key seeds, and join pruning.",
-        ),
-    ] = 0.9,
-    date_caps: Annotated[
-        str | None,
-        typer.Option(
-            help=(
-                "Date caps override as comma-separated key=value pairs, e.g. "
-                "'temporal_overlap=0.6,mixed_temporal=0.75'"
-            )
-        ),
-    ] = None,
-    join_weight: Annotated[
-        list[str] | None,
-        typer.Option("--join-weight", help="Override join weight, e.g. jaccard=0.2"),
-    ] = None,
-    xlsx_sheet: Annotated[
-        list[str] | None,
-        typer.Option("--xlsx-sheet", help="Per-file sheet mapping, e.g. sales.xlsx=Sheet2"),
-    ] = None,
-    json_flatten_depth: Annotated[
-        int,
-        typer.Option(min=0, help="Flatten depth for nested JSON objects."),
-    ] = 1,
-    fast_profile: Annotated[
-        bool,
-        typer.Option(help="Enable faster profiling (skips expensive entropy/duplicate scans)."),
-    ] = False,
-    profile_entropy_cap: Annotated[
-        int,
-        typer.Option(min=100, help="Max non-null values used for entropy computation per column."),
-    ] = 50_000,
-) -> None:
-    """Build and export join graph as JSON."""
-    graph_report = build_graph_report(
-        path=path,
-        min_confidence=min_confidence,
-        sample_rows=sample_rows,
-        sample_seed=sample_seed,
-        max_tables=max_tables,
-        max_columns=max_columns,
-        top_k_edges=top_k_edges,
-        distinct_low_card_threshold=distinct_low_card_threshold,
-        near_unique_threshold=near_unique_threshold,
-        date_caps=_parse_float_assignments_csv(date_caps, label="date-caps"),
-        fast_profile=fast_profile,
-        profile_entropy_cap=profile_entropy_cap,
-        join_weights=_parse_weight_assignments(join_weight or []),
-        xlsx_sheet_map=_parse_assignments(xlsx_sheet or [], label="xlsx-sheet"),
-        json_flatten_depth=json_flatten_depth,
-    )
-    rendered = graph_report.model_dump_json(indent=2)
-
-    if out is None:
-        typer.echo(rendered)
-        return
-
-    out.write_text(rendered, encoding="utf-8")
-    typer.echo(f"Wrote graph: {out}")
 
 
 @app.command("export-sql")
@@ -368,15 +252,6 @@ def debug_site_command(
         float,
         typer.Option(min=0.0, max=1.0, help="Minimum confidence threshold for relationship lines."),
     ] = 0.75,
-    top_k_edges: Annotated[
-        int,
-        typer.Option(
-            "--top-k-edges",
-            "--graph-top-k-per-pair",
-            min=1,
-            help="Top K join edges retained per table pair.",
-        ),
-    ] = 3,
     distinct_low_card_threshold: Annotated[
         int,
         typer.Option(min=1, help="Distinct-count threshold used for low-cardinality trap guard."),
@@ -429,7 +304,6 @@ def debug_site_command(
         max_tables=max_tables,
         max_columns=max_columns,
         min_confidence=min_confidence,
-        graph_top_k_per_pair=top_k_edges,
         distinct_low_card_threshold=distinct_low_card_threshold,
         near_unique_threshold=near_unique_threshold,
         date_caps=_parse_float_assignments_csv(date_caps, label="date-caps"),
