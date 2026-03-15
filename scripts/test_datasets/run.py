@@ -12,6 +12,7 @@ if __package__ in {None, ""}:
     # Allow `python scripts/test_datasets/run.py` to import `test_datasets.*`.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from test_datasets.common import apply_mixed_table_formats
 from test_datasets.domains import derived, health, retail, saas
 
 DOMAIN_ORDER = ("retail", "health", "saas", "derived")
@@ -26,10 +27,13 @@ def parse_args(argv: list[str] | None = None) -> tuple[argparse.Namespace, list[
         epilog=(
             "Examples:\n"
             "  python scripts/test_datasets/run.py --output-dir test_datasets\n"
-            "  python scripts/test_datasets/run.py --domain retail --profile tiny --output-dir test_datasets\n"
+            "  python scripts/test_datasets/run.py --domain retail --profile tiny "
+            "--output-dir test_datasets\n"
             "  python scripts/test_datasets/run.py --domain derived --output-dir test_datasets\n"
-            "  python scripts/test_datasets/run.py --pct-derived-keys 0.5 --output-dir test_datasets\n"
-            "  python scripts/test_datasets/run.py --domain saas --n-invoices 2000 --output-dir test_datasets"
+            "  python scripts/test_datasets/run.py --pct-derived-keys 0.5 "
+            "--output-dir test_datasets\n"
+            "  python scripts/test_datasets/run.py --domain saas --n-invoices 2000 "
+            "--output-dir test_datasets"
         ),
     )
 
@@ -76,7 +80,7 @@ def parse_args(argv: list[str] | None = None) -> tuple[argparse.Namespace, list[
     json_group.add_argument(
         "--include-json",
         action="store_true",
-        help="Generate optional nested JSON files for each selected domain.",
+        help="Generate optional domain-specific nested JSON files.",
     )
     json_group.add_argument(
         "--max-json-records",
@@ -158,6 +162,7 @@ def _run_domain(
     else:
         raise ValueError(f"Unsupported domain: {domain}")
 
+    apply_mixed_table_formats(domain_out)
     return domain_out
 
 

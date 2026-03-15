@@ -26,6 +26,12 @@ smartjoin generate-test-datasets --domain derived --output-dir test_datasets
 ```
 
 Outputs are written under `<output-dir>/<domain>/`, including `manifest.json` and generated input files.
+By default, domain tables are emitted in mixed formats so each dataset includes a blend of:
+
+- `.csv`
+- `.json`
+- `.parquet`
+- `.xlsx`
 
 ## Explicit Common Flags
 

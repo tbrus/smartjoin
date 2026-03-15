@@ -1,10 +1,10 @@
 import json
 import subprocess
 import sys
-from csv import DictReader
 from pathlib import Path
 
 from smartjoin.analysis import analyze_path
+from smartjoin.ingestion import load_tables
 
 
 def test_generator_writes_core_relationship_and_trap_summary(tmp_path: Path) -> None:
@@ -66,17 +66,10 @@ def test_generator_writes_core_relationship_and_trap_summary(tmp_path: Path) -> 
     )
     assert manifest["expected_joins"]
 
-    customers_regions: set[str] = set()
-    with (out_dir / "customers.csv").open("r", encoding="utf-8") as handle:
-        reader = DictReader(handle)
-        for row in reader:
-            customers_regions.add(row["region_code"])
-
-    products_regions: set[str] = set()
-    with (out_dir / "products.csv").open("r", encoding="utf-8") as handle:
-        reader = DictReader(handle)
-        for row in reader:
-            products_regions.add(row["region_code"])
+    tables = load_tables(out_dir)
+    by_name = {table.name: table for table in tables}
+    customers_regions = {str(value) for value in by_name["customers"].df["region_code"].to_list()}
+    products_regions = {str(value) for value in by_name["products"].df["region_code"].to_list()}
 
     assert len(customers_regions & products_regions) > 0
 

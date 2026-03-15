@@ -4,6 +4,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+EXPECTED_TABLE_FORMATS = {".csv", ".json", ".parquet", ".xlsx"}
+
+
+def _emitted_table_formats(domain_dir: Path) -> set[str]:
+    files = [
+        path
+        for path in domain_dir.iterdir()
+        if path.is_file()
+        and path.suffix.lower() in EXPECTED_TABLE_FORMATS
+        and path.name != "manifest.json"
+    ]
+    return {path.suffix.lower() for path in files}
+
 
 def test_cli_generate_test_datasets_command(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
@@ -49,6 +62,7 @@ def test_cli_generate_test_datasets_command(tmp_path: Path) -> None:
 
     retail_dir = output_root / "retail"
     assert (retail_dir / "manifest.json").exists()
+    assert EXPECTED_TABLE_FORMATS.issubset(_emitted_table_formats(retail_dir))
     generation_manifest = json.loads(
         (output_root / "generation_manifest.json").read_text(encoding="utf-8")
     )
@@ -119,6 +133,7 @@ def test_cli_generate_test_datasets_all_domains_with_derived_flags(tmp_path: Pat
 
     for domain in generated_domains:
         manifest = json.loads((output_root / domain / "manifest.json").read_text(encoding="utf-8"))
+        assert EXPECTED_TABLE_FORMATS.issubset(_emitted_table_formats(output_root / domain))
         assert manifest["config"]["pct_missing"] == 0.03
         assert manifest["config"]["pct_duplicates"] == 0.02
         assert manifest["config"]["pct_dirty_keys"] == 0.07
@@ -164,6 +179,7 @@ def test_cli_generate_test_datasets_derived_domain(tmp_path: Path) -> None:
 
     derived_dir = output_root / "derived"
     assert (derived_dir / "manifest.json").exists()
+    assert EXPECTED_TABLE_FORMATS.issubset(_emitted_table_formats(derived_dir))
     generation_manifest = json.loads(
         (output_root / "generation_manifest.json").read_text(encoding="utf-8")
     )

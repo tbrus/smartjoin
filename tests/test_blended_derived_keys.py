@@ -1,9 +1,10 @@
-import csv
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+from smartjoin.ingestion import load_tables
 
 
 def _contains_derived_pattern(values: list[str]) -> bool:
@@ -11,13 +12,14 @@ def _contains_derived_pattern(values: list[str]) -> bool:
     return any(pattern.search(value.strip().lower()) for value in values if value)
 
 
-def _read_column(path: Path, column: str) -> list[str]:
-    values: list[str] = []
-    with path.open("r", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle)
-        for row in reader:
-            values.append(str(row.get(column, "")))
-    return values
+def _read_table_column(dataset_dir: Path, table_name: str, column: str) -> list[str]:
+    tables = load_tables(dataset_dir)
+    by_name = {table.name: table for table in tables}
+    if table_name not in by_name:
+        raise AssertionError(f"Missing expected table: {table_name}")
+    if column not in by_name[table_name].df.columns:
+        raise AssertionError(f"Missing expected column: {table_name}.{column}")
+    return [str(value) for value in by_name[table_name].df[column].to_list()]
 
 
 def test_retail_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> None:
@@ -51,11 +53,11 @@ def test_retail_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> 
     relationships = manifest["ground_truth"]["core_relationships"]
     assert any(rel.get("derived_side") == "both_tables" for rel in relationships)
 
-    order_customer_keys = _read_column(retail_dir / "orders.csv", "customer_key_id")
+    order_customer_keys = _read_table_column(retail_dir, "orders", "customer_key_id")
     assert _contains_derived_pattern(order_customer_keys)
 
-    payment_ids = _read_column(retail_dir / "payments.csv", "payment_id")
-    refund_payment_keys = _read_column(retail_dir / "refunds.csv", "payment_key_id")
+    payment_ids = _read_table_column(retail_dir, "payments", "payment_id")
+    refund_payment_keys = _read_table_column(retail_dir, "refunds", "payment_key_id")
     assert _contains_derived_pattern(payment_ids)
     assert _contains_derived_pattern(refund_payment_keys)
 
@@ -91,11 +93,11 @@ def test_health_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> 
     relationships = manifest["ground_truth"]["core_relationships"]
     assert any(rel.get("derived_side") == "both_tables" for rel in relationships)
 
-    encounter_patient_keys = _read_column(health_dir / "encounters.csv", "patient_key_id")
+    encounter_patient_keys = _read_table_column(health_dir, "encounters", "patient_key_id")
     assert _contains_derived_pattern(encounter_patient_keys)
 
-    payment_ids = _read_column(health_dir / "payments.csv", "payment_id")
-    adjustment_payment_ids = _read_column(health_dir / "adjustments.csv", "payment_id")
+    payment_ids = _read_table_column(health_dir, "payments", "payment_id")
+    adjustment_payment_ids = _read_table_column(health_dir, "adjustments", "payment_id")
     assert _contains_derived_pattern(payment_ids)
     assert _contains_derived_pattern(adjustment_payment_ids)
 
@@ -131,11 +133,11 @@ def test_saas_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> No
     relationships = manifest["ground_truth"]["core_relationships"]
     assert any(rel.get("derived_side") == "both_tables" for rel in relationships)
 
-    account_keys = _read_column(saas_dir / "users.csv", "account_key_id")
+    account_keys = _read_table_column(saas_dir, "users", "account_key_id")
     assert _contains_derived_pattern(account_keys)
 
-    payment_ids = _read_column(saas_dir / "payments.csv", "payment_id")
-    refund_payment_ids = _read_column(saas_dir / "refunds.csv", "payment_id")
+    payment_ids = _read_table_column(saas_dir, "payments", "payment_id")
+    refund_payment_ids = _read_table_column(saas_dir, "refunds", "payment_id")
     assert _contains_derived_pattern(payment_ids)
     assert _contains_derived_pattern(refund_payment_ids)
 

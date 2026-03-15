@@ -1,6 +1,7 @@
 """Shared helpers for test dataset generators."""
 
 from .constants import COUNTRIES, CURRENCIES
+from .formats import apply_mixed_table_formats
 from .helpers import (
     derive_prefixed_numeric,
     dirty_key,
@@ -21,6 +22,7 @@ __all__ = [
     "build_manifest",
     "derive_prefixed_numeric",
     "dirty_key",
+    "apply_mixed_table_formats",
     "expected_joins_from_relationships",
     "idf",
     "iso",

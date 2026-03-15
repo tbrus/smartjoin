@@ -3,6 +3,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+EXPECTED_TABLE_FORMATS = {".csv", ".json", ".parquet", ".xlsx"}
+
+
+def _emitted_table_formats(domain_dir: Path) -> set[str]:
+    files = [
+        path
+        for path in domain_dir.iterdir()
+        if path.is_file()
+        and path.suffix.lower() in EXPECTED_TABLE_FORMATS
+        and path.name != "manifest.json"
+    ]
+    return {path.suffix.lower() for path in files}
+
 
 def test_run_cli_single_domain_with_passthrough_args(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
@@ -35,6 +48,7 @@ def test_run_cli_single_domain_with_passthrough_args(tmp_path: Path) -> None:
 
     retail_dir = output_root / "retail"
     assert (retail_dir / "manifest.json").exists()
+    assert EXPECTED_TABLE_FORMATS.issubset(_emitted_table_formats(retail_dir))
 
     manifest = json.loads((retail_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["row_counts"]["customers"] > 0
@@ -81,6 +95,8 @@ def test_run_cli_all_domains_with_tiny_profile(tmp_path: Path) -> None:
     assert (output_root / "health" / "manifest.json").exists()
     assert (output_root / "saas" / "manifest.json").exists()
     assert (output_root / "derived" / "manifest.json").exists()
+    for domain in ["retail", "health", "saas", "derived"]:
+        assert EXPECTED_TABLE_FORMATS.issubset(_emitted_table_formats(output_root / domain))
 
     generation_manifest = json.loads(
         (output_root / "generation_manifest.json").read_text(encoding="utf-8")
@@ -121,6 +137,8 @@ def test_run_cli_all_domains_with_tiny_profile(tmp_path: Path) -> None:
         assert manifest["config"]["pct_derived_both_sides"] == 0.25
         assert manifest["config"]["pct_inconsistent_types"] == 0.05
         assert manifest["config"]["include_json"] is True
+        for table_spec in manifest["ground_truth"]["core_tables"]:
+            assert (output_root / domain / table_spec["file"]).exists()
 
 
 def test_run_cli_derived_domain(tmp_path: Path) -> None:
@@ -148,6 +166,7 @@ def test_run_cli_derived_domain(tmp_path: Path) -> None:
 
     derived_dir = output_root / "derived"
     assert (derived_dir / "manifest.json").exists()
+    assert EXPECTED_TABLE_FORMATS.issubset(_emitted_table_formats(derived_dir))
 
     manifest = json.loads((derived_dir / "manifest.json").read_text(encoding="utf-8"))
     case_names = {item["name"] for item in manifest["ground_truth"]["regression_cases"]}
