@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import re
 from difflib import SequenceMatcher
 
 import polars as pl
@@ -1053,6 +1054,481 @@ def _drop_noncanonical_alias_edges(
     return kept
 
 
+def _candidate_endpoint_key(candidate: JoinCandidate) -> tuple[str, str, str, str]:
+    return (
+        candidate.left_table,
+        candidate.left_column,
+        candidate.right_table,
+        candidate.right_column,
+    )
+
+
+def _canonical_identifier_key(
+    sig: ColumnSignature,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+) -> tuple[str, str] | None:
+    if not _is_identifier(sig):
+        return None
+    entity_core = sig.name_features.entity_core
+    if not entity_core:
+        return None
+    winner = table_identifier_winners.get((sig.table_name, entity_core))
+    if winner is None:
+        return None
+    winner_table, winner_column = winner
+    if winner_table != sig.table_name:
+        return None
+    return winner_table, winner_column
+
+
+def _meaningful_name_tokens(sig: ColumnSignature) -> frozenset[str]:
+    ignored = {
+        "id",
+        "key",
+        "ref",
+        "code",
+        "uuid",
+        "dash",
+        "hash",
+        "slash",
+        "under",
+        "spaced",
+        "space",
+        "hyphen",
+        "underscore",
+        "direct",
+        "formatted",
+        "format",
+        "normalized",
+        "clean",
+        "raw",
+    }
+    return frozenset(token for token in sig.name_features.tokens if token not in ignored)
+
+
+def _columns_have_competing_semantics(
+    left: ColumnSignature,
+    right: ColumnSignature,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+    many_to_many_mode: bool,
+) -> bool:
+    if left.column_name == right.column_name:
+        return True
+    if _canonical_identifier_key(left, table_identifier_winners) == _canonical_identifier_key(
+        right, table_identifier_winners
+    ):
+        return True
+
+    left_tokens = _meaningful_name_tokens(left)
+    right_tokens = _meaningful_name_tokens(right)
+    if left_tokens and right_tokens and left_tokens == right_tokens:
+        return True
+
+    name_similarity = _name_similarity(left, right)
+    if name_similarity >= 0.92:
+        return True
+
+    if many_to_many_mode and entity_cores_compatible(left, right) and name_similarity >= 0.75:
+        return True
+    return False
+
+
+def _columns_have_strong_same_role_similarity(
+    left: ColumnSignature,
+    right: ColumnSignature,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+    many_to_many_mode: bool,
+) -> bool:
+    if left.column_name == right.column_name:
+        return True
+    left_canonical = _canonical_identifier_key(left, table_identifier_winners)
+    right_canonical = _canonical_identifier_key(right, table_identifier_winners)
+    if left_canonical is not None and left_canonical == right_canonical:
+        return True
+
+    left_tokens = _meaningful_name_tokens(left)
+    right_tokens = _meaningful_name_tokens(right)
+    if left_tokens and right_tokens and left_tokens == right_tokens:
+        return True
+
+    threshold = 0.9 if many_to_many_mode else 0.94
+    return entity_cores_compatible(left, right) and _name_similarity(left, right) >= threshold
+
+
+def _candidate_table_pair_key(candidate: JoinCandidate) -> tuple[str, str]:
+    return tuple(sorted((candidate.left_table, candidate.right_table)))
+
+
+def _candidate_shares_source(left: JoinCandidate, right: JoinCandidate) -> bool:
+    return left.left_table == right.left_table and left.left_column == right.left_column
+
+
+def _candidate_shares_target(left: JoinCandidate, right: JoinCandidate) -> bool:
+    return left.right_table == right.right_table and left.right_column == right.right_column
+
+
+_ROLE_QUALIFIER_TOKENS = {
+    "sold",
+    "bill",
+    "ship",
+    "buyer",
+    "seller",
+    "payer",
+    "payee",
+    "owner",
+    "assignee",
+    "requester",
+    "approver",
+    "source",
+    "target",
+    "primary",
+    "secondary",
+}
+
+
+def _has_conflicting_role_qualifiers(left: ColumnSignature, right: ColumnSignature) -> bool:
+    left_roles = set(left.name_features.tokens) & _ROLE_QUALIFIER_TOKENS
+    right_roles = set(right.name_features.tokens) & _ROLE_QUALIFIER_TOKENS
+    if not left_roles or not right_roles:
+        return False
+    return len(left_roles & right_roles) == 0
+
+
+def _apply_derived_transform(
+    value: object,
+    transform_id: str,
+    params: dict[str, object],
+) -> str | None:
+    text = str(value).strip()
+    if not text:
+        return None
+    normalized_id = str(transform_id or "").strip().lower()
+    if normalized_id == "strip_non_alnum":
+        transformed = re.sub(r"[^A-Za-z0-9]", "", text)
+        return transformed or None
+    if normalized_id == "lowercase":
+        transformed = text.lower()
+        return transformed or None
+    if normalized_id == "strip_hyphens_underscores":
+        transformed = re.sub(r"[-_]", "", text)
+        return transformed or None
+    if normalized_id == "remove_prefix":
+        prefix = str(params.get("prefix", "")).strip()
+        if not prefix:
+            return text
+        pattern = re.compile(rf"^{re.escape(prefix)}[-_\s]*", re.IGNORECASE)
+        transformed = pattern.sub("", text, count=1)
+        return transformed or None
+    if normalized_id == "replace_prefix":
+        from_prefix = str(params.get("from", "")).strip()
+        to_prefix = str(params.get("to", "")).strip()
+        if not from_prefix:
+            return text
+        pattern = re.compile(rf"^{re.escape(from_prefix)}[-_\s]*", re.IGNORECASE)
+        transformed = pattern.sub(to_prefix, text, count=1)
+        return transformed or None
+    return text
+
+
+def _candidate_competition_values(
+    candidate: JoinCandidate,
+    signatures: SignatureCache,
+    anchor_side: str,
+) -> frozenset[object]:
+    if anchor_side == "left":
+        opposite_sig = signatures[(candidate.right_table, candidate.right_column)]
+        anchor_sig = signatures[(candidate.left_table, candidate.left_column)]
+    else:
+        opposite_sig = signatures[(candidate.left_table, candidate.left_column)]
+        anchor_sig = signatures[(candidate.right_table, candidate.right_column)]
+
+    # Compare overlap in anchor-normalized space.
+    if not opposite_sig.sampled_unique_set:
+        return frozenset()
+
+    use_derived_transform = (
+        candidate.derived is not None
+        and candidate.derived.derived_from_table == opposite_sig.table_name
+        and candidate.derived.derived_from_column == opposite_sig.column_name
+    )
+    if not use_derived_transform:
+        normalized = {
+            normalize_transformed_value_for_signature(value, signature=anchor_sig)
+            for value in opposite_sig.sampled_unique_set
+        }
+        return frozenset(normalized)
+
+    transformed_values: set[object] = set()
+    transform_params = dict(candidate.derived.params)
+    for raw in opposite_sig.sampled_unique_set:
+        transformed = _apply_derived_transform(
+            value=raw,
+            transform_id=candidate.derived.transform_id,
+            params=transform_params,
+        )
+        if transformed is None:
+            continue
+        transformed_values.add(
+            normalize_transformed_value_for_signature(transformed, signature=anchor_sig)
+        )
+    return frozenset(transformed_values)
+
+
+def _columns_have_competing_overlap(
+    left_values: frozenset[object],
+    right_values: frozenset[object],
+    many_to_many_mode: bool,
+) -> bool:
+    if not left_values or not right_values:
+        return False
+
+    jaccard = _jaccard(left_values, right_values)
+    inclusion_lr = _estimated_inclusion_from_sets(
+        left_set=left_values,
+        right_set=right_values,
+        right_distinct_count=max(len(right_values), 1),
+    )
+    inclusion_rl = _estimated_inclusion_from_sets(
+        left_set=right_values,
+        right_set=left_values,
+        right_distinct_count=max(len(left_values), 1),
+    )
+
+    if many_to_many_mode:
+        return jaccard >= 0.82 and inclusion_lr >= 0.90 and inclusion_rl >= 0.90
+    return jaccard >= 0.90 and inclusion_lr >= 0.94 and inclusion_rl >= 0.94
+
+
+def _identifier_hub_preference(
+    sig: ColumnSignature,
+    identifier_hubs: dict[str, tuple[str, str]],
+) -> int:
+    if not _is_identifier(sig):
+        return 0
+    hub_group = sig.name_features.entity_core or sig.name_features.normalized
+    winner = identifier_hubs.get(hub_group)
+    if winner is None:
+        return 0
+    return int(winner == (sig.table_name, sig.column_name))
+
+
+def _candidate_competition_rank(
+    candidate: JoinCandidate,
+    signatures: SignatureCache,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+    identifier_hubs: dict[str, tuple[str, str]],
+) -> tuple[float, int, float, int, float, float, float, int, str, str, str, str]:
+    left_sig = signatures[(candidate.left_table, candidate.left_column)]
+    right_sig = signatures[(candidate.right_table, candidate.right_column)]
+    signals = candidate.breakdown.signals
+    canonical_quality = (
+        _canonical_identifier_penalty(
+            sig=left_sig,
+            table_identifier_winners=table_identifier_winners,
+        )
+        + _canonical_identifier_penalty(
+            sig=right_sig,
+            table_identifier_winners=table_identifier_winners,
+        )
+    ) / 2.0
+    hub_preference = _identifier_hub_preference(
+        left_sig, identifier_hubs
+    ) + _identifier_hub_preference(right_sig, identifier_hubs)
+    total_name_len = len(left_sig.column_name) + len(right_sig.column_name)
+    return (
+        candidate.confidence,
+        int(candidate.derived is None),
+        canonical_quality,
+        hub_preference,
+        float(signals.get("inclusion_fk_in_pk", 0.0)),
+        float(signals.get("jaccard", 0.0)),
+        float(signals.get("name_similarity", 0.0)),
+        -total_name_len,
+        candidate.left_table.lower(),
+        candidate.left_column.lower(),
+        candidate.right_table.lower(),
+        candidate.right_column.lower(),
+    )
+
+
+def _are_competing_candidates(
+    left: JoinCandidate,
+    right: JoinCandidate,
+    signatures: SignatureCache,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+) -> bool:
+    if _candidate_table_pair_key(left) != _candidate_table_pair_key(right):
+        return False
+    if left.relationship_guess != right.relationship_guess:
+        return False
+
+    many_to_many_mode = left.relationship_guess == "many_to_many"
+    shares_source = _candidate_shares_source(left, right)
+    shares_target = _candidate_shares_target(left, right)
+
+    left_left_sig = signatures[(left.left_table, left.left_column)]
+    left_right_sig = signatures[(left.right_table, left.right_column)]
+    right_left_sig = signatures[(right.left_table, right.left_column)]
+    right_right_sig = signatures[(right.right_table, right.right_column)]
+
+    same_role_both = _columns_have_strong_same_role_similarity(
+        left_left_sig,
+        right_left_sig,
+        table_identifier_winners,
+        many_to_many_mode,
+    ) and _columns_have_strong_same_role_similarity(
+        left_right_sig,
+        right_right_sig,
+        table_identifier_winners,
+        many_to_many_mode,
+    )
+    if not (shares_source or shares_target or same_role_both):
+        return False
+
+    if shares_source:
+        if _has_conflicting_role_qualifiers(left_right_sig, right_right_sig):
+            return False
+        return _columns_have_competing_overlap(
+            _candidate_competition_values(left, signatures, anchor_side="left"),
+            _candidate_competition_values(right, signatures, anchor_side="left"),
+            many_to_many_mode,
+        )
+
+    if shares_target:
+        if _has_conflicting_role_qualifiers(left_left_sig, right_left_sig):
+            return False
+        return _columns_have_competing_overlap(
+            _candidate_competition_values(left, signatures, anchor_side="right"),
+            _candidate_competition_values(right, signatures, anchor_side="right"),
+            many_to_many_mode,
+        )
+
+    if _has_conflicting_role_qualifiers(left_left_sig, right_left_sig):
+        return False
+    if _has_conflicting_role_qualifiers(left_right_sig, right_right_sig):
+        return False
+    left_overlap = _columns_have_competing_overlap(
+        _candidate_competition_values(left, signatures, anchor_side="right"),
+        _candidate_competition_values(right, signatures, anchor_side="right"),
+        many_to_many_mode,
+    )
+    right_overlap = _columns_have_competing_overlap(
+        _candidate_competition_values(left, signatures, anchor_side="left"),
+        _candidate_competition_values(right, signatures, anchor_side="left"),
+        many_to_many_mode,
+    )
+    if many_to_many_mode:
+        return left_overlap or right_overlap
+    return left_overlap and right_overlap
+
+
+def _candidate_dominates(
+    left: JoinCandidate,
+    right: JoinCandidate,
+    signatures: SignatureCache,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+    identifier_hubs: dict[str, tuple[str, str]],
+) -> bool:
+    if not _are_competing_candidates(
+        left=left,
+        right=right,
+        signatures=signatures,
+        table_identifier_winners=table_identifier_winners,
+    ):
+        return False
+
+    left_rank = _candidate_competition_rank(
+        left,
+        signatures=signatures,
+        table_identifier_winners=table_identifier_winners,
+        identifier_hubs=identifier_hubs,
+    )
+    right_rank = _candidate_competition_rank(
+        right,
+        signatures=signatures,
+        table_identifier_winners=table_identifier_winners,
+        identifier_hubs=identifier_hubs,
+    )
+    if left_rank == right_rank:
+        return False
+
+    many_to_many_mode = left.relationship_guess == "many_to_many"
+    confidence_margin = left.confidence - right.confidence
+    dominance_margin = 0.005 if many_to_many_mode else 0.02
+    if confidence_margin >= dominance_margin:
+        return True
+    if confidence_margin <= -dominance_margin:
+        return False
+
+    if many_to_many_mode:
+        return left_rank > right_rank
+    return confidence_margin >= -0.002 and left_rank > right_rank
+
+
+def _prune_competing_candidates(
+    candidates: list[JoinCandidate],
+    signatures: SignatureCache,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+    identifier_hubs: dict[str, tuple[str, str]],
+) -> list[JoinCandidate]:
+    """
+    Prune near-duplicate competing joins within the same table pair.
+
+    Two candidates compete when they share source/target anchors or strongly match
+    as the same role on both sides, and overlap evidence says they describe the
+    same relationship slot.
+    """
+    by_pair: dict[tuple[str, str], list[JoinCandidate]] = {}
+    for candidate in candidates:
+        by_pair.setdefault(_candidate_table_pair_key(candidate), []).append(candidate)
+
+    kept: list[JoinCandidate] = []
+    for pair_candidates in by_pair.values():
+        dropped: set[int] = set()
+        for left_idx, right_idx in itertools.combinations(range(len(pair_candidates)), 2):
+            if left_idx in dropped or right_idx in dropped:
+                continue
+            left_candidate = pair_candidates[left_idx]
+            right_candidate = pair_candidates[right_idx]
+            if _candidate_dominates(
+                left=left_candidate,
+                right=right_candidate,
+                signatures=signatures,
+                table_identifier_winners=table_identifier_winners,
+                identifier_hubs=identifier_hubs,
+            ):
+                dropped.add(right_idx)
+                continue
+            if _candidate_dominates(
+                left=right_candidate,
+                right=left_candidate,
+                signatures=signatures,
+                table_identifier_winners=table_identifier_winners,
+                identifier_hubs=identifier_hubs,
+            ):
+                dropped.add(left_idx)
+        for idx, candidate in enumerate(pair_candidates):
+            if idx in dropped:
+                continue
+            kept.append(candidate)
+    return kept
+
+
+def _prune_competing_candidate_neighborhoods(
+    candidates: list[JoinCandidate],
+    signatures: SignatureCache,
+    table_identifier_winners: dict[tuple[str, str], tuple[str, str]],
+    identifier_hubs: dict[str, tuple[str, str]],
+) -> list[JoinCandidate]:
+    """Compatibility wrapper for older call-site naming."""
+    return _prune_competing_candidates(
+        candidates=candidates,
+        signatures=signatures,
+        table_identifier_winners=table_identifier_winners,
+        identifier_hubs=identifier_hubs,
+    )
+
+
 def _score_candidate(
     *,
     fk_sig: ColumnSignature,
@@ -1565,6 +2041,12 @@ def find_join_candidates(
         candidates=final_candidates,
         signatures=signatures,
         table_identifier_winners=table_identifier_winners,
+    )
+    final_candidates = _prune_competing_candidate_neighborhoods(
+        candidates=final_candidates,
+        signatures=signatures,
+        table_identifier_winners=table_identifier_winners,
+        identifier_hubs=identifier_hubs,
     )
     return sorted(
         final_candidates,
