@@ -99,3 +99,23 @@ If SmartJoin saved you from manual joins, give it a ⭐️
 ## 📜 License
 
 Licensed under the [MIT License](LICENSE)
+
+## CLI
+
+Use a single command to generate all primary outputs:
+
+```bash
+smartjoin run <path> <out-dir>
+```
+
+This writes:
+- `<out-dir>/report.json`
+- `<out-dir>/schema.sql`
+- `<out-dir>/debug_viewer/index.html`
+- `<out-dir>/debug_viewer/data.json`
+
+Dataset generation remains available via:
+
+```bash
+smartjoin generate-test-datasets --output-dir <output-dir>
+```
