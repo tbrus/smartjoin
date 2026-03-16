@@ -17,7 +17,6 @@ from smartjoin.config import (
     AnalysisSettings,
     merge_date_caps,
 )
-from smartjoin.exporters import build_sql_skeleton
 from smartjoin.ingestion import load_tables
 from smartjoin.joins import find_join_candidates
 from smartjoin.keys import discover_keys
@@ -109,24 +108,3 @@ def analyze_path(
         keys=keys,
         joins=joins,
     )
-
-
-def export_sql(
-    path: Path,
-    max_tables: int | None = None,
-    max_columns: int | None = None,
-    xlsx_sheet_map: dict[str, str] | None = None,
-    json_flatten_depth: int = 1,
-) -> str:
-    """Generate SQL skeleton from inferred table schemas and key candidates."""
-    tables = load_tables(
-        path=path,
-        max_tables=max_tables,
-        max_columns=max_columns,
-        xlsx_sheet_map=xlsx_sheet_map,
-        json_flatten_depth=json_flatten_depth,
-    )
-    if len(tables) == 0:
-        raise ValueError("No supported data files found for SQL export.")
-    keys = discover_keys(tables=tables)
-    return build_sql_skeleton(tables=tables, keys=keys)

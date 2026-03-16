@@ -110,7 +110,6 @@ smartjoin run <path> <out-dir>
 
 This writes:
 - `<out-dir>/report.json`
-- `<out-dir>/schema.sql`
 - `<out-dir>/debug_viewer/index.html`
 - `<out-dir>/debug_viewer/data.json`
 

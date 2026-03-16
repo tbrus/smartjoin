@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 import typer
 
-from smartjoin.analysis import analyze_path, export_sql
+from smartjoin.analysis import analyze_path
 from smartjoin.debug_site import build_debug_site
 
 app = typer.Typer(
@@ -174,13 +174,12 @@ def run_command(
         ),
     ] = None,
 ) -> None:
-    """Run full Smartjoin workflow and write report, SQL, and debug viewer artifacts."""
+    """Run Smartjoin workflow and write report plus debug viewer artifacts."""
     if format.lower() != "json":
         raise typer.BadParameter("Only --format json is supported.")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path = out_dir / "report.json"
-    sql_path = out_dir / "schema.sql"
     viewer_dir = out_dir / "debug_viewer"
     parsed_date_caps = _parse_float_assignments_csv(date_caps, label="date-caps")
     parsed_join_weights = _parse_weight_assignments(join_weight or [])
@@ -204,16 +203,6 @@ def run_command(
     )
     report_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     typer.echo(f"Wrote report: {report_path}")
-
-    sql = export_sql(
-        path=path,
-        max_tables=max_tables,
-        max_columns=max_columns,
-        xlsx_sheet_map=parsed_xlsx_sheet_map,
-        json_flatten_depth=json_flatten_depth,
-    )
-    sql_path.write_text(sql, encoding="utf-8")
-    typer.echo(f"Wrote SQL skeleton: {sql_path}")
 
     index_path, data_path = build_debug_site(
         path=path,
