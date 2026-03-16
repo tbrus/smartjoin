@@ -950,7 +950,7 @@ DEBUG_SITE_HTML = """<!doctype html>
   <div class="shell">
     <aside class="sidebar">
       <h1 class="brand"><span style="color: #20b5dd;">smart</span><span style="color: #81cb8b;">join</span></h1>
-      <p class="sub">Discovery-first relationship investigation with optional evaluation overlay.</p>
+      <p class="sub">Deterministic relationship discovery for structured datasets.</p>
       <section class="panel">
         <h3>Filters</h3>
         <div class="control-stack">
