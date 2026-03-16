@@ -254,24 +254,24 @@ DEBUG_SITE_HTML = """<!doctype html>
   <title>Smartjoin Debug Viewer</title>
   <style>
     :root{
-      --bg:#0a1120;
-      --bg-2:#0e172b;
-      --surface:rgba(17, 27, 45, 0.88);
-      --surface-strong:#121d33;
-      --surface-soft:#17253e;
-      --ink:#e6eefc;
-      --muted:#9aabc3;
-      --edge:#7f93b2;
+      --bg:#111418;
+      --bg-2:#1a1f25;
+      --surface:rgba(33, 38, 45, 0.9);
+      --surface-strong:#262c34;
+      --surface-soft:#2d343d;
+      --ink:#edf1f7;
+      --muted:#a8b0bc;
+      --edge:#8d97a6;
       --edge-found:#31cf7f;
       --edge-missing:#ff627c;
       --edge-unexpected:#5ba7ff;
       --accent:#4bc4ff;
       --accent-soft:rgba(75, 196, 255, 0.2);
-      --card:#121f36;
-      --border:rgba(148, 163, 184, 0.26);
+      --card:#242b33;
+      --border:rgba(143, 152, 165, 0.3);
       --ring:rgba(75, 196, 255, 0.35);
-      --shadow-soft:0 10px 24px rgba(2, 6, 15, 0.45);
-      --shadow-strong:0 22px 38px rgba(2, 6, 15, 0.58);
+      --shadow-soft:0 10px 24px rgba(1, 2, 4, 0.5);
+      --shadow-strong:0 22px 38px rgba(0, 0, 0, 0.62);
     }
     *{box-sizing:border-box}
     *::-webkit-scrollbar{width:10px;height:10px}
@@ -287,8 +287,8 @@ DEBUG_SITE_HTML = """<!doctype html>
       font-family:"Sora","IBM Plex Sans","Segoe UI",sans-serif;
       color:var(--ink);
       background:
-        radial-gradient(1100px 430px at -12% -8%, rgba(41,92,170,0.3) 0%, transparent 62%),
-        radial-gradient(860px 340px at 108% -6%, rgba(23,156,143,0.2) 0%, transparent 62%),
+        radial-gradient(1100px 430px at -12% -8%, rgba(75,196,255,0.1) 0%, transparent 62%),
+        radial-gradient(860px 340px at 108% -6%, rgba(49,207,127,0.08) 0%, transparent 62%),
         linear-gradient(145deg, var(--bg) 0%, var(--bg-2) 100%);
       min-height:100vh;
       line-height:1.35;
@@ -301,18 +301,18 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
     .sidebar{
       border-right:1px solid var(--border);
-      background:rgba(10,17,30,0.82);
+      background:rgba(16, 19, 23, 0.86);
       backdrop-filter:blur(14px);
       padding:18px 16px 14px;
       overflow:auto;
-      box-shadow:inset -1px 0 0 rgba(138,166,204,0.08);
+      box-shadow:inset -1px 0 0 rgba(183, 191, 201, 0.08);
     }
     .brand{
       margin:0 0 4px 0;
       font-size:1.24rem;
       letter-spacing:0.01em;
       font-weight:750;
-      color:#81cb8b;
+      color:#70d7c7;
     }
     .sub{
       margin:0 0 14px 0;
@@ -347,7 +347,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
     .mini-btn{
       border:1px solid var(--border);
-      background:linear-gradient(180deg, rgba(30,47,73,0.98) 0%, rgba(23,36,58,0.98) 100%);
+      background:linear-gradient(180deg, rgba(52,58,68,0.98) 0%, rgba(39,45,54,0.98) 100%);
       color:var(--ink);
       border-radius:999px;
       padding:7px 11px;
@@ -372,7 +372,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-radius:11px;
       padding:8px 10px;
       font-size:0.82rem;
-      background:rgba(16, 25, 41, 0.95);
+      background:rgba(32, 37, 44, 0.95);
       color:var(--ink);
       transition:border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
     }
@@ -381,7 +381,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       outline:none;
       border-color:rgba(75,196,255,0.62);
       box-shadow:0 0 0 3px var(--ring);
-      background:rgba(20, 32, 52, 1);
+      background:rgba(41, 47, 56, 1);
     }
     .tabs{
       display:flex;
@@ -391,7 +391,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
     .tab{
       border:1px solid var(--border);
-      background:linear-gradient(180deg, rgba(29,45,70,0.96) 0%, rgba(21,34,54,0.96) 100%);
+      background:linear-gradient(180deg, rgba(47,54,63,0.96) 0%, rgba(36,42,50,0.96) 100%);
       color:var(--ink);
       border-radius:999px;
       padding:7px 13px;
@@ -430,7 +430,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       width:100%;
       text-align:left;
       border:1px solid var(--border);
-      background:linear-gradient(180deg, rgba(24,37,59,0.98) 0%, rgba(18,30,49,0.98) 100%);
+      background:linear-gradient(180deg, rgba(45,51,60,0.98) 0%, rgba(33,38,46,0.98) 100%);
       border-radius:11px;
       padding:8px 10px;
       color:var(--ink);
@@ -493,12 +493,12 @@ DEBUG_SITE_HTML = """<!doctype html>
       padding:8px 10px;
       border:1px solid var(--border);
       border-radius:12px;
-      background:linear-gradient(165deg, rgba(22,35,57,0.94), rgba(17,27,44,0.94));
+      background:linear-gradient(165deg, rgba(45,52,61,0.94), rgba(34,40,48,0.94));
     }
     .coverage-strip{
       margin-bottom:0;
       padding:10px;
-      background:linear-gradient(120deg, rgba(19,30,50,0.94), rgba(15,24,40,0.95));
+      background:linear-gradient(120deg, rgba(39,45,53,0.94), rgba(31,36,43,0.95));
     }
     .metric-grid{
       display:grid;
@@ -508,7 +508,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .metric-card{
       border:1px solid var(--border);
       border-radius:12px;
-      background:linear-gradient(160deg, rgba(23,35,56,0.98) 0%, rgba(17,27,44,0.98) 100%);
+      background:linear-gradient(160deg, rgba(47,54,63,0.98) 0%, rgba(36,42,49,0.98) 100%);
       padding:9px 9px 10px;
       box-shadow:0 8px 16px rgba(2, 8, 18, 0.4);
       position:relative;
@@ -553,7 +553,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       max-height:72vh;
       border-radius:16px;
       border:1px solid var(--border);
-      background:rgba(13,22,37,0.94);
+      background:rgba(27, 32, 39, 0.94);
       box-shadow:var(--shadow-strong);
       height:100%;
     }
@@ -569,7 +569,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .canvas-wrap{
       position:relative;
       border:1px solid var(--border);
-      background:rgba(13,22,37,0.92);
+      background:rgba(24, 29, 36, 0.92);
       border-radius:16px;
       box-shadow:var(--shadow-strong);
       min-height:680px;
@@ -580,8 +580,8 @@ DEBUG_SITE_HTML = """<!doctype html>
       width:1800px;
       height:1200px;
       background:
-        linear-gradient(transparent 31px, rgba(128,148,176,0.08) 32px),
-        linear-gradient(90deg, transparent 31px, rgba(128,148,176,0.08) 32px);
+        linear-gradient(transparent 31px, rgba(158,171,187,0.07) 32px),
+        linear-gradient(90deg, transparent 31px, rgba(158,171,187,0.07) 32px);
       background-size:32px 32px;
     }
     .edge-layer{
@@ -640,7 +640,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       filter:saturate(0.8);
     }
     .table-head{
-      background:linear-gradient(120deg, rgba(35,56,86,0.95) 0%, rgba(24,42,68,0.95) 100%);
+      background:linear-gradient(120deg, rgba(58,66,77,0.95) 0%, rgba(45,52,62,0.95) 100%);
       border-bottom:1px solid var(--border);
       padding:10px 12px;
       cursor:grab;
@@ -672,9 +672,9 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-bottom:1px dashed rgba(130,152,182,0.18);
       font-family:"IBM Plex Mono","Fira Code","Consolas",monospace;
       font-size:0.73rem;
-      background:rgba(16, 26, 43, 0.98);
+      background:rgba(34, 40, 47, 0.98);
     }
-    .column-list li:nth-child(even){background:rgba(13, 22, 37, 0.98)}
+    .column-list li:nth-child(even){background:rgba(29, 34, 41, 0.98)}
     .column-list li.join-col{
       background:var(--accent-soft);
       color:#b9e9ff;
@@ -683,7 +683,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .data-grid,.truth-grid{
       border:1px solid var(--border);
       border-radius:16px;
-      background:rgba(14, 24, 40, 0.94);
+      background:rgba(28, 33, 40, 0.94);
       box-shadow:var(--shadow-strong);
       display:flex;
       flex-direction:column;
@@ -697,7 +697,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-bottom:1px solid var(--border);
       align-items:center;
       flex-wrap:wrap;
-      background:linear-gradient(120deg, rgba(20,33,53,0.96) 0%, rgba(15,26,43,0.96) 100%);
+      background:linear-gradient(120deg, rgba(44,51,61,0.96) 0%, rgba(34,40,48,0.96) 100%);
     }
     .table-preview{
       overflow:auto;
@@ -716,7 +716,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .right-rail{
       border:1px solid var(--border);
       border-radius:16px;
-      background:rgba(14, 24, 40, 0.94);
+      background:rgba(28, 33, 40, 0.94);
       box-shadow:var(--shadow-strong);
       overflow:auto;
       padding:12px;
@@ -724,14 +724,14 @@ DEBUG_SITE_HTML = """<!doctype html>
       min-height:360px;
     }
     .rail-section.inspector{
-      background:linear-gradient(165deg, rgba(24,38,61,0.98) 0%, rgba(18,30,50,0.98) 100%);
+      background:linear-gradient(165deg, rgba(48,55,64,0.98) 0%, rgba(37,43,51,0.98) 100%);
     }
     .inspector-block{
       border:1px dashed rgba(133,156,186,0.24);
       border-radius:10px;
       padding:8px;
       margin-bottom:8px;
-      background:rgba(16, 27, 45, 0.9);
+      background:rgba(35, 40, 47, 0.9);
     }
     .inspector-grid{
       display:grid;
@@ -740,7 +740,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       font-size:0.78rem;
     }
     .inspector-grid strong{
-      color:#b7d9ff;
+      color:#d7dde8;
       font-size:0.72rem;
       text-transform:uppercase;
       letter-spacing:0.05em;
@@ -764,7 +764,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .rail-section{
       border:1px solid var(--border);
       border-radius:12px;
-      background:linear-gradient(160deg, rgba(23,36,57,0.98) 0%, rgba(17,28,46,0.98) 100%);
+      background:linear-gradient(160deg, rgba(46,53,62,0.98) 0%, rgba(35,41,49,0.98) 100%);
       padding:10px;
       margin-bottom:10px;
       box-shadow:0 8px 16px rgba(2, 8, 18, 0.4);
@@ -798,7 +798,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .truth-card{
       border:1px solid var(--border);
       border-radius:12px;
-      background:rgba(24, 38, 61, 0.94);
+      background:rgba(45, 52, 61, 0.94);
       padding:10px;
     }
     .truth-card h4{
@@ -826,7 +826,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       border-spacing:0;
       width:100%;
       min-width:760px;
-      background:rgba(12, 20, 34, 0.98);
+      background:rgba(27, 32, 39, 0.98);
       border:1px solid rgba(130,152,182,0.24);
       border-radius:12px;
       overflow:hidden;
@@ -842,13 +842,13 @@ DEBUG_SITE_HTML = """<!doctype html>
     table.preview th{
       position:sticky;
       top:0;
-      background:linear-gradient(120deg, rgba(29,47,73,0.98) 0%, rgba(23,38,61,0.98) 100%);
+      background:linear-gradient(120deg, rgba(56,64,74,0.98) 0%, rgba(45,52,61,0.98) 100%);
       z-index:2;
       font-weight:700;
       font-size:0.74rem;
       text-transform:uppercase;
       letter-spacing:0.05em;
-      color:#c9dcf6;
+      color:#d6dde8;
     }
     .hint{
       font-size:0.77rem;
@@ -896,7 +896,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     .edge-tooltip{
       position:fixed;
       pointer-events:none;
-      background:rgba(8,15,27,0.98);
+      background:rgba(15, 18, 24, 0.98);
       color:#e7f0ff;
       border-radius:12px;
       padding:10px 14px;
