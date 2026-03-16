@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "smartjoin"
 version = "0.1.0"
-description = "Deterministic relational inference engine for structured datasets."
+description = "Deterministic relationship discovery for structured datasets."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
