@@ -110,8 +110,8 @@ smartjoin run <path> <out-dir>
 
 This writes:
 - `<out-dir>/report.json`
-- `<out-dir>/debug_viewer/index.html`
-- `<out-dir>/debug_viewer/data.json`
+- `<out-dir>/explorer/index.html`
+- `<out-dir>/explorer/data.json`
 
 Dataset generation remains available via:
 

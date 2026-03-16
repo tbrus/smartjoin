@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 import typer
 
 from smartjoin.analysis import analyze_path
-from smartjoin.debug_site import build_debug_site
+from smartjoin.explorer import build_explorer
 
 app = typer.Typer(
     help="Deterministic relationship discovery for structured datasets.",
@@ -122,12 +122,12 @@ def run_command(
         typer.Option(
             min=0.0,
             max=1.0,
-            help="Initial confidence threshold for relationship lines in the viewer.",
+            help="Initial confidence threshold for relationship lines in the explorer.",
         ),
     ] = 0.75,
     preview_rows: Annotated[
         int,
-        typer.Option(min=1, max=200, help="Sample rows per table shown in the viewer."),
+        typer.Option(min=1, max=200, help="Sample rows per table shown in the explorer."),
     ] = 25,
     distinct_low_card_threshold: Annotated[
         int,
@@ -174,13 +174,13 @@ def run_command(
         ),
     ] = None,
 ) -> None:
-    """Run Smartjoin workflow and write report plus debug viewer artifacts."""
+    """Run Smartjoin workflow and write report plus explorer artifacts."""
     if format.lower() != "json":
         raise typer.BadParameter("Only --format json is supported.")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path = out_dir / "report.json"
-    viewer_dir = out_dir / "debug_viewer"
+    viewer_dir = out_dir / "explorer"
     parsed_date_caps = _parse_float_assignments_csv(date_caps, label="date-caps")
     parsed_join_weights = _parse_weight_assignments(join_weight or [])
     parsed_xlsx_sheet_map = _parse_assignments(xlsx_sheet or [], label="xlsx-sheet")
@@ -204,7 +204,7 @@ def run_command(
     report_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     typer.echo(f"Wrote report: {report_path}")
 
-    index_path, data_path = build_debug_site(
+    index_path, data_path = build_explorer(
         path=path,
         out_dir=viewer_dir,
         sample_rows=sample_rows,
@@ -223,8 +223,8 @@ def run_command(
         json_flatten_depth=json_flatten_depth,
         precomputed_report=report,
     )
-    typer.echo(f"Wrote debug viewer: {index_path}")
-    typer.echo(f"Wrote debug data: {data_path}")
+    typer.echo(f"Wrote explorer UI: {index_path}")
+    typer.echo(f"Wrote explorer data: {data_path}")
 
 
 @app.command(

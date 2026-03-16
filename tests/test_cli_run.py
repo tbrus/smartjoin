@@ -49,8 +49,8 @@ def test_cli_run_command_writes_all_outputs(tmp_path: Path) -> None:
     )
 
     report_path = output_dir / "report.json"
-    viewer_index_path = output_dir / "debug_viewer" / "index.html"
-    viewer_data_path = output_dir / "debug_viewer" / "data.json"
+    viewer_index_path = output_dir / "explorer" / "index.html"
+    viewer_data_path = output_dir / "explorer" / "data.json"
 
     assert report_path.exists()
     assert viewer_index_path.exists()

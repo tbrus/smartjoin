@@ -1,4 +1,4 @@
-"""Static debug site generator for relationship inspection."""
+"""Static explorer generator for relationship inspection."""
 
 # ruff: noqa: E501
 
@@ -246,12 +246,12 @@ def _build_payload(
     }
 
 
-DEBUG_SITE_HTML = """<!doctype html>
+EXPLORER_HTML = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Smartjoin Debug Viewer</title>
+  <title>Smartjoin Explorer</title>
   <style>
     :root{
       --bg:#111418;
@@ -2104,7 +2104,7 @@ DEBUG_SITE_HTML = """<!doctype html>
     }
 
     init().catch((err) => {
-      document.body.innerHTML = `<pre style="padding:16px;color:#7a2415">Failed to load debug data: ${err}</pre>`;
+      document.body.innerHTML = `<pre style="padding:16px;color:#7a2415">Failed to load explorer data: ${err}</pre>`;
     });
   </script>
 </body>
@@ -2112,7 +2112,7 @@ DEBUG_SITE_HTML = """<!doctype html>
 """
 
 
-def build_debug_site(
+def build_explorer(
     path: Path,
     out_dir: Path,
     sample_rows: int = 10_000,
@@ -2131,7 +2131,7 @@ def build_debug_site(
     json_flatten_depth: int = 1,
     precomputed_report: AnalysisReport | None = None,
 ) -> tuple[Path, Path]:
-    """Generate debug site artifacts `(index_path, data_path)`."""
+    """Generate explorer artifacts `(index_path, data_path)`."""
     payload = _build_payload(
         path=path,
         sample_rows=sample_rows,
@@ -2156,7 +2156,7 @@ def build_debug_site(
     data_path = out_dir / "data.json"
     payload_json = json.dumps(_jsonable(payload), indent=2, allow_nan=False)
     embedded_payload = payload_json.replace("</", "<\\/")
-    rendered_html = DEBUG_SITE_HTML.replace("__SMARTJOIN_EMBEDDED_DATA__", embedded_payload)
+    rendered_html = EXPLORER_HTML.replace("__SMARTJOIN_EMBEDDED_DATA__", embedded_payload)
     index_path.write_text(rendered_html, encoding="utf-8")
     data_path.write_text(payload_json, encoding="utf-8")
     return index_path, data_path

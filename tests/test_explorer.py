@@ -4,12 +4,12 @@ from pathlib import Path
 
 import polars as pl
 
-from smartjoin.debug_site import _jsonable, build_debug_site
+from smartjoin.explorer import _jsonable, build_explorer
 
 
-def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
+def test_build_explorer_writes_html_and_json(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
-    out_dir = tmp_path / "debug_site"
+    out_dir = tmp_path / "explorer"
     data_dir.mkdir(parents=True, exist_ok=True)
 
     pl.DataFrame({"customer_id": [1, 2, 3], "name": ["a", "b", "c"]}).write_csv(
@@ -19,7 +19,7 @@ def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
         data_dir / "orders.csv"
     )
 
-    index_path, data_path = build_debug_site(
+    index_path, data_path = build_explorer(
         path=data_dir,
         out_dir=out_dir,
         sample_rows=100,
@@ -59,9 +59,9 @@ def test_build_debug_site_writes_html_and_json(tmp_path: Path) -> None:
     assert "manifest" in payload
 
 
-def test_build_debug_site_includes_manifest_when_available(tmp_path: Path) -> None:
+def test_build_explorer_includes_manifest_when_available(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
-    out_dir = tmp_path / "debug_site"
+    out_dir = tmp_path / "explorer"
     data_dir.mkdir(parents=True, exist_ok=True)
 
     pl.DataFrame({"customer_id": [1, 2], "name": ["a", "b"]}).write_csv(data_dir / "customers.csv")
@@ -87,7 +87,7 @@ def test_build_debug_site_includes_manifest_when_available(tmp_path: Path) -> No
         encoding="utf-8",
     )
 
-    _, data_path = build_debug_site(
+    _, data_path = build_explorer(
         path=data_dir,
         out_dir=out_dir,
         sample_rows=100,
