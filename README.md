@@ -110,6 +110,7 @@ smartjoin run <path> <out-dir>
 
 This writes:
 - `<out-dir>/report.json`
+- `<out-dir>/relationships.csv`
 - `<out-dir>/explorer/index.html`
 - `<out-dir>/explorer/data.json`
 

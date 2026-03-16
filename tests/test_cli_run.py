@@ -49,10 +49,12 @@ def test_cli_run_command_writes_all_outputs(tmp_path: Path) -> None:
     )
 
     report_path = output_dir / "report.json"
+    relationships_path = output_dir / "relationships.csv"
     viewer_index_path = output_dir / "explorer" / "index.html"
     viewer_data_path = output_dir / "explorer" / "data.json"
 
     assert report_path.exists()
+    assert relationships_path.exists()
     assert viewer_index_path.exists()
     assert viewer_data_path.exists()
 
@@ -63,6 +65,14 @@ def test_cli_run_command_writes_all_outputs(tmp_path: Path) -> None:
     viewer_payload = json.loads(viewer_data_path.read_text(encoding="utf-8"))
     assert "report" in viewer_payload
     assert "tables" in viewer_payload
+
+    relationships = pl.read_csv(relationships_path)
+    assert {"left_table", "left_column", "right_table", "right_column"}.issubset(
+        set(relationships.columns)
+    )
+    assert {"confidence", "relationship_guess", "weighted_score", "is_derived"}.issubset(
+        set(relationships.columns)
+    )
 
 
 def test_cli_help_lists_run_and_hides_legacy_commands(tmp_path: Path) -> None:

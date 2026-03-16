@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import importlib.util
 from pathlib import Path
 from typing import Annotated, Literal
@@ -10,6 +11,7 @@ import typer
 
 from smartjoin.analysis import analyze_path
 from smartjoin.explorer import build_explorer
+from smartjoin.models import AnalysisReport
 
 app = typer.Typer(
     help="Deterministic relationship discovery for structured datasets.",
@@ -54,6 +56,72 @@ def _parse_float_assignments_csv(raw: str | None, label: str) -> dict[str, float
         except ValueError as exc:
             raise typer.BadParameter(f"Invalid numeric {label} value for {key}: {value}") from exc
     return parsed
+
+
+def _write_relationship_metrics_table(report: AnalysisReport, out_path: Path) -> None:
+    """Write discovered relationships and scoring metrics as a flat CSV table."""
+    signal_keys = sorted(
+        {
+            signal_name
+            for join in report.joins
+            for signal_name in join.breakdown.signals.keys()
+        }
+    )
+    weight_keys = sorted(
+        {
+            weight_name
+            for join in report.joins
+            for weight_name in join.breakdown.weights.keys()
+        }
+    )
+
+    base_columns = [
+        "left_table",
+        "left_column",
+        "right_table",
+        "right_column",
+        "confidence",
+        "relationship_guess",
+        "weighted_score",
+        "is_derived",
+        "derived_transform_id",
+        "derived_description",
+        "derived_from_table",
+        "derived_from_column",
+        "derived_notes",
+    ]
+    signal_columns = [f"signal_{name}" for name in signal_keys]
+    weight_columns = [f"weight_{name}" for name in weight_keys]
+    fieldnames = [*base_columns, *signal_columns, *weight_columns]
+
+    rows: list[dict[str, object]] = []
+    for join in report.joins:
+        derived = join.derived
+        row: dict[str, object] = {
+            "left_table": join.left_table,
+            "left_column": join.left_column,
+            "right_table": join.right_table,
+            "right_column": join.right_column,
+            "confidence": join.confidence,
+            "relationship_guess": join.relationship_guess,
+            "weighted_score": join.breakdown.weighted_score,
+            "is_derived": bool(derived),
+            "derived_transform_id": derived.transform_id if derived else "",
+            "derived_description": (derived.description or "") if derived else "",
+            "derived_from_table": derived.derived_from_table if derived else "",
+            "derived_from_column": derived.derived_from_column if derived else "",
+            "derived_notes": (derived.notes or "") if derived else "",
+        }
+        for signal_name in signal_keys:
+            row[f"signal_{signal_name}"] = join.breakdown.signals.get(signal_name, "")
+        for weight_name in weight_keys:
+            row[f"weight_{weight_name}"] = join.breakdown.weights.get(weight_name, "")
+        rows.append(row)
+
+    with out_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def _load_test_dataset_runner() -> object:
@@ -174,12 +242,13 @@ def run_command(
         ),
     ] = None,
 ) -> None:
-    """Run Smartjoin workflow and write report plus explorer artifacts."""
+    """Run Smartjoin workflow and write report, relationship table, and explorer artifacts."""
     if format.lower() != "json":
         raise typer.BadParameter("Only --format json is supported.")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path = out_dir / "report.json"
+    relationships_table_path = out_dir / "relationships.csv"
     viewer_dir = out_dir / "explorer"
     parsed_date_caps = _parse_float_assignments_csv(date_caps, label="date-caps")
     parsed_join_weights = _parse_weight_assignments(join_weight or [])
@@ -201,9 +270,6 @@ def run_command(
         xlsx_sheet_map=parsed_xlsx_sheet_map,
         json_flatten_depth=json_flatten_depth,
     )
-    report_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
-    typer.echo(f"Wrote report: {report_path}")
-
     index_path, data_path = build_explorer(
         path=path,
         out_dir=viewer_dir,
@@ -223,6 +289,10 @@ def run_command(
         json_flatten_depth=json_flatten_depth,
         precomputed_report=report,
     )
+    report_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    _write_relationship_metrics_table(report=report, out_path=relationships_table_path)
+    typer.echo(f"Wrote report: {report_path}")
+    typer.echo(f"Wrote relationships table: {relationships_table_path}")
     typer.echo(f"Wrote explorer UI: {index_path}")
     typer.echo(f"Wrote explorer data: {data_path}")
 
