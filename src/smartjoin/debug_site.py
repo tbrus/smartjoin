@@ -312,7 +312,7 @@ DEBUG_SITE_HTML = """<!doctype html>
       font-size:1.24rem;
       letter-spacing:0.01em;
       font-weight:750;
-      color:#0f2836;
+      color:#81cb8b;
     }
     .sub{
       margin:0 0 14px 0;
@@ -949,7 +949,7 @@ DEBUG_SITE_HTML = """<!doctype html>
 <body>
   <div class="shell">
     <aside class="sidebar">
-      <h1 class="brand">Smartjoin Workbench</h1>
+      <h1 class="brand"><span style="color: #20b5dd;">smart</span><span style="color: #81cb8b;">join</span></h1>
       <p class="sub">Discovery-first relationship investigation with optional evaluation overlay.</p>
       <section class="panel">
         <h3>Filters</h3>
