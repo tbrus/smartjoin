@@ -2019,7 +2019,9 @@ EXPLORER_HTML = """<!doctype html>
         const ground = manifest.ground_truth || {};
         const coreRelations = ground.core_relationships || ground.core_relationshpis || [];
         const expectedMap = collectExpectedJoins(manifest, coreRelations);
-        state.relationshipPool = buildRelationshipPool(expectedMap, predictedJoins, true);
+        // Build evaluation categories from thresholded predictions so below-threshold
+        // expected joins are represented as missing in both table rows and edges.
+        state.relationshipPool = buildRelationshipPool(expectedMap, predictedAtThreshold, true);
         const expectedKeys = new Set(expectedMap.keys());
         const predictedKeys = new Set(predictedMap.keys());
         found = Array.from(expectedMap.entries())
