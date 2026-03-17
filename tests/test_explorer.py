@@ -36,6 +36,9 @@ def test_build_explorer_writes_html_and_json(tmp_path: Path) -> None:
     assert "modeToggle" in html
     assert "relationshipTypeFilter" in html
     assert "derivedFilter" in html
+    assert "relationshipSearch" in html
+    assert "relationshipSort" in html
+    assert "relationshipsTableBody" in html
     assert "metricAvgConfidence" in html
     assert "joinsFoundList" in html
     assert "missingJoinsList" in html

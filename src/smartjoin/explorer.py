@@ -419,30 +419,6 @@ EXPLORER_HTML = """<!doctype html>
     input[type="range"], select{
       width:100%;
     }
-    .table-list{
-      list-style:none;
-      padding:0;
-      margin:0;
-      display:grid;
-      gap:8px;
-    }
-    .table-list button{
-      width:100%;
-      text-align:left;
-      border:1px solid var(--border);
-      background:linear-gradient(180deg, rgba(45,51,60,0.98) 0%, rgba(33,38,46,0.98) 100%);
-      border-radius:11px;
-      padding:8px 10px;
-      color:var(--ink);
-      cursor:pointer;
-      font-size:0.81rem;
-      transition:all 140ms ease;
-    }
-    .table-list button:hover{
-      border-color:rgba(102, 202, 255, 0.42);
-      transform:translateX(1px);
-      box-shadow:0 10px 20px rgba(3, 10, 20, 0.42);
-    }
     .main{
       padding:18px;
       overflow:hidden;
@@ -781,6 +757,81 @@ EXPLORER_HTML = """<!doctype html>
       line-height:1.42;
       padding-right:4px;
     }
+    .relationships-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:8px;
+    }
+    .relationships-head h4{
+      margin:0;
+    }
+    .relationships-toolbar{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 170px;
+      gap:8px;
+      margin-bottom:8px;
+    }
+    .relationships-table-wrap{
+      border:1px solid rgba(130,152,182,0.2);
+      border-radius:10px;
+      overflow:auto;
+      max-height:280px;
+      background:rgba(28, 33, 40, 0.95);
+    }
+    .relationships-table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      min-width:560px;
+      font-size:0.75rem;
+    }
+    .relationships-table th,
+    .relationships-table td{
+      padding:7px 8px;
+      border-bottom:1px solid rgba(130,152,182,0.14);
+      text-align:left;
+      vertical-align:middle;
+      white-space:nowrap;
+    }
+    .relationships-table th{
+      position:sticky;
+      top:0;
+      z-index:1;
+      background:linear-gradient(120deg, rgba(54,62,72,0.98) 0%, rgba(43,50,59,0.98) 100%);
+      text-transform:uppercase;
+      letter-spacing:0.05em;
+      font-size:0.69rem;
+      color:#d6dde8;
+    }
+    .relationships-table tr{
+      cursor:pointer;
+      transition:background 120ms ease;
+    }
+    .relationships-table tr:hover{
+      background:rgba(74, 136, 186, 0.16);
+    }
+    .relationships-table tr.selected{
+      background:rgba(75, 196, 255, 0.22);
+      box-shadow:inset 0 0 0 1px rgba(75, 196, 255, 0.38);
+    }
+    .rel-pill{
+      display:inline-block;
+      border:1px solid rgba(130,152,182,0.36);
+      border-radius:999px;
+      padding:1px 8px;
+      font-size:0.67rem;
+      letter-spacing:0.04em;
+      text-transform:uppercase;
+      color:#d9e3f2;
+      background:rgba(78, 92, 108, 0.34);
+    }
+    .rel-pill.derived{
+      border-color:rgba(75, 196, 255, 0.5);
+      color:#b5e8ff;
+      background:rgba(75, 196, 255, 0.16);
+    }
     .rail-list ul{
       margin:0;
       padding-left:16px;
@@ -943,6 +994,9 @@ EXPLORER_HTML = """<!doctype html>
       .metric-grid{
         grid-template-columns:repeat(2, minmax(120px, 1fr));
       }
+      .relationships-toolbar{
+        grid-template-columns:1fr;
+      }
     }
   </style>
 </head>
@@ -982,10 +1036,6 @@ EXPLORER_HTML = """<!doctype html>
             Visible joins: <strong id="visibleJoinCount">0</strong>
           </div>
         </div>
-      </section>
-      <section class="panel">
-        <h3>Tables</h3>
-        <ul id="tableList" class="table-list"></ul>
       </section>
     </aside>
     <main class="main">
@@ -1036,6 +1086,38 @@ EXPLORER_HTML = """<!doctype html>
           </div>
         </div>
         <aside class="right-rail">
+          <section class="rail-section">
+            <div class="relationships-head">
+              <h4>Relationship Table</h4>
+              <div class="hint">Rows: <strong id="relationshipTableCount">0</strong></div>
+            </div>
+            <div class="relationships-toolbar">
+              <input id="relationshipSearch" type="text" placeholder="Filter relationships">
+              <select id="relationshipSort">
+                <option value="confidence_desc">Confidence high->low</option>
+                <option value="confidence_asc">Confidence low->high</option>
+                <option value="type_asc">Type A->Z</option>
+                <option value="left_asc">Source A->Z</option>
+                <option value="right_asc">Target A->Z</option>
+              </select>
+            </div>
+            <div class="relationships-table-wrap">
+              <table class="relationships-table">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Target</th>
+                    <th>Type</th>
+                    <th>Conf</th>
+                    <th>Mode</th>
+                  </tr>
+                </thead>
+                <tbody id="relationshipsTableBody">
+                  <tr><td colspan="5" class="hint">No relationships to display.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
           <section class="rail-section inspector">
             <h4>Selected Relationship</h4>
             <div class="rail-list" id="relationshipInspector">
@@ -1082,6 +1164,8 @@ EXPLORER_HTML = """<!doctype html>
       viewerMode: "discovered",
       relationshipType: "all",
       derivedMode: "both",
+      relationshipSearch: "",
+      relationshipSort: "confidence_desc",
       hasGroundTruth: false,
       selectedRelationshipKey: null,
       relationshipPool: [],
@@ -1260,6 +1344,95 @@ EXPLORER_HTML = """<!doctype html>
           return relationKey(leftRef, rightRef) === key;
         }) || null
       );
+    }
+
+    function relationshipKeyFor(rel) {
+      if (!rel) return "";
+      if (rel.key) return String(rel.key);
+      const leftRef = `${rel.left_table}.${rel.left_column}`;
+      const rightRef = `${rel.right_table}.${rel.right_column}`;
+      return relationKey(leftRef, rightRef);
+    }
+
+    function relationshipLabelParts(rel) {
+      const left = `${rel.left_table}.${rel.left_column}`;
+      const right = `${rel.right_table}.${rel.right_column}`;
+      return { left, right };
+    }
+
+    function compareStringsAsc(a, b) {
+      return String(a || "").localeCompare(String(b || ""));
+    }
+
+    function sortedFilteredRelationshipsForTable() {
+      const query = state.relationshipSearch.trim().toLowerCase();
+      let rows = [...activeRelationships()];
+      if (query) {
+        rows = rows.filter((rel) => {
+          const parts = relationshipLabelParts(rel);
+          const haystack = `${parts.left} ${parts.right} ${rel.relationship_guess || ""}`.toLowerCase();
+          return haystack.includes(query);
+        });
+      }
+
+      const sortMode = state.relationshipSort || "confidence_desc";
+      rows.sort((a, b) => {
+        if (sortMode === "confidence_asc") {
+          return Number(a.confidence || 0) - Number(b.confidence || 0);
+        }
+        if (sortMode === "type_asc") {
+          return compareStringsAsc(a.relationship_guess, b.relationship_guess);
+        }
+        if (sortMode === "left_asc") {
+          const leftA = `${a.left_table}.${a.left_column}`;
+          const leftB = `${b.left_table}.${b.left_column}`;
+          return compareStringsAsc(leftA, leftB);
+        }
+        if (sortMode === "right_asc") {
+          const rightA = `${a.right_table}.${a.right_column}`;
+          const rightB = `${b.right_table}.${b.right_column}`;
+          return compareStringsAsc(rightA, rightB);
+        }
+        return Number(b.confidence || 0) - Number(a.confidence || 0);
+      });
+      return rows;
+    }
+
+    function renderRelationshipsTable() {
+      const body = document.getElementById("relationshipsTableBody");
+      const count = document.getElementById("relationshipTableCount");
+      if (!body) return;
+      const rows = sortedFilteredRelationshipsForTable();
+      if (count) count.textContent = String(rows.length);
+
+      if (rows.length === 0) {
+        body.innerHTML = `<tr><td colspan="5" class="hint">No relationships match current filters.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = "";
+      rows.forEach((rel) => {
+        const parts = relationshipLabelParts(rel);
+        const key = relationshipKeyFor(rel);
+        const tr = document.createElement("tr");
+        if (state.selectedRelationshipKey === key) {
+          tr.classList.add("selected");
+        }
+        const derivedLabel = rel.derived ? "Derived" : "Direct";
+        const confidence = Number(rel.confidence || 0).toFixed(3);
+        tr.innerHTML = `
+          <td>${escapeHtml(parts.left)}</td>
+          <td>${escapeHtml(parts.right)}</td>
+          <td>${escapeHtml(String(rel.relationship_guess || "unknown"))}</td>
+          <td>${confidence}</td>
+          <td><span class="rel-pill ${rel.derived ? "derived" : ""}">${derivedLabel}</span></td>
+        `;
+        tr.addEventListener("click", () => {
+          state.selectedRelationshipKey = key;
+          refreshSelectedRelationshipViews();
+        });
+        body.appendChild(tr);
+      });
     }
 
     function renderRelationshipInspector() {
@@ -1521,35 +1694,6 @@ EXPLORER_HTML = """<!doctype html>
       return map;
     }
 
-    function switchToData() {
-      const dataView = document.getElementById("dataView");
-      if (dataView) {
-        dataView.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }
-
-    function renderTableList() {
-      const list = document.getElementById("tableList");
-      list.innerHTML = "";
-      const matching = refreshMatchingTables();
-      const visibleTables = state.payload.tables.filter((table) => matching.has(table.name));
-      visibleTables.forEach((table) => {
-        const button = document.createElement("button");
-        button.textContent = `${table.name} (${table.row_count.toLocaleString()} rows)`;
-        button.addEventListener("click", () => {
-          document.getElementById("tableSelect").value = table.name;
-          renderTablePreview();
-          switchToData();
-        });
-        const li = document.createElement("li");
-        li.appendChild(button);
-        list.appendChild(li);
-      });
-      if (visibleTables.length === 0) {
-        list.innerHTML = `<li><div class="hint">No tables match current filter.</div></li>`;
-      }
-    }
-
     function buildCard(table, joinCols) {
       const card = document.createElement("article");
       card.className = "table-card";
@@ -1639,8 +1783,7 @@ EXPLORER_HTML = """<!doctype html>
         path.style.pointerEvents = "stroke";
         path.addEventListener("click", () => {
           state.selectedRelationshipKey = relKey;
-          drawEdges(state.currentRelationships, canvas, edgeLayer);
-          renderRelationshipInspector();
+          refreshSelectedRelationshipViews();
         });
         if (tooltipEl) {
           path.addEventListener("pointerenter", (event) => {
@@ -1655,6 +1798,16 @@ EXPLORER_HTML = """<!doctype html>
         }
         edgeLayer.appendChild(path);
       });
+    }
+
+    function refreshSelectedRelationshipViews() {
+      const canvas = document.getElementById("diagramCanvas");
+      const edgeLayer = document.getElementById("edgeLayer");
+      if (canvas && edgeLayer) {
+        drawEdges(state.currentRelationships, canvas, edgeLayer);
+      }
+      renderRelationshipInspector();
+      renderRelationshipsTable();
     }
 
     function findColumnElement(canvas, tableName, columnName) {
@@ -1989,6 +2142,7 @@ EXPLORER_HTML = """<!doctype html>
       setMetric("metricMissing", missing.length);
       setMetric("metricUnexpected", unexpected.length);
       renderRelationshipInspector();
+      renderRelationshipsTable();
     }
 
     async function init() {
@@ -2007,6 +2161,8 @@ EXPLORER_HTML = """<!doctype html>
       const edgeModeSelect = document.getElementById("edgeMode");
       const relationshipTypeFilter = document.getElementById("relationshipTypeFilter");
       const derivedFilter = document.getElementById("derivedFilter");
+      const relationshipSearchInput = document.getElementById("relationshipSearch");
+      const relationshipSortSelect = document.getElementById("relationshipSort");
       const relayoutBtn = document.getElementById("relayoutBtn");
       const fitViewBtn = document.getElementById("fitViewBtn");
       const clearFilterBtn = document.getElementById("clearFilterBtn");
@@ -2019,6 +2175,8 @@ EXPLORER_HTML = """<!doctype html>
       configureRelationshipTypeOptions();
       configureEdgeModeOptions();
       configureEvaluationUI();
+      state.relationshipSearch = relationshipSearchInput?.value || "";
+      state.relationshipSort = relationshipSortSelect?.value || "confidence_desc";
       slider.value = String(state.payload.meta.min_confidence ?? 0.75);
       state.threshold = Number(slider.value);
       label.textContent = Number(slider.value).toFixed(2);
@@ -2027,7 +2185,6 @@ EXPLORER_HTML = """<!doctype html>
         label.textContent = Number(slider.value).toFixed(2);
         state.selectedRelationshipKey = null;
         renderRelationshipSummary();
-        renderTableList();
         renderDiagram();
       });
       modeToggle.addEventListener("change", () => {
@@ -2035,14 +2192,12 @@ EXPLORER_HTML = """<!doctype html>
         state.edgeMode = "all";
         state.selectedRelationshipKey = null;
         renderRelationshipSummary();
-        renderTableList();
         renderDiagram();
       });
       searchInput.addEventListener("input", () => {
         state.tableQuery = searchInput.value || "";
         state.selectedRelationshipKey = null;
         renderRelationshipSummary();
-        renderTableList();
         renderDiagram();
       });
       edgeModeSelect.addEventListener("change", () => {
@@ -2055,15 +2210,21 @@ EXPLORER_HTML = """<!doctype html>
         state.relationshipType = relationshipTypeFilter.value || "all";
         state.selectedRelationshipKey = null;
         renderRelationshipSummary();
-        renderTableList();
         renderDiagram();
       });
       derivedFilter.addEventListener("change", () => {
         state.derivedMode = derivedFilter.value || "both";
         state.selectedRelationshipKey = null;
         renderRelationshipSummary();
-        renderTableList();
         renderDiagram();
+      });
+      relationshipSearchInput.addEventListener("input", () => {
+        state.relationshipSearch = relationshipSearchInput.value || "";
+        renderRelationshipsTable();
+      });
+      relationshipSortSelect.addEventListener("change", () => {
+        state.relationshipSort = relationshipSortSelect.value || "confidence_desc";
+        renderRelationshipsTable();
       });
       relayoutBtn.addEventListener("click", () => {
         autoLayoutTables();
@@ -2078,14 +2239,17 @@ EXPLORER_HTML = """<!doctype html>
         state.edgeMode = "all";
         state.relationshipType = "all";
         state.derivedMode = "both";
+        state.relationshipSearch = "";
+        state.relationshipSort = "confidence_desc";
         state.viewerMode = state.hasGroundTruth ? state.viewerMode : "discovered";
         state.selectedRelationshipKey = null;
         searchInput.value = "";
         modeToggle.value = state.viewerMode;
         relationshipTypeFilter.value = "all";
         derivedFilter.value = "both";
+        relationshipSearchInput.value = "";
+        relationshipSortSelect.value = "confidence_desc";
         renderRelationshipSummary();
-        renderTableList();
         renderDiagram();
       });
 
@@ -2096,7 +2260,6 @@ EXPLORER_HTML = """<!doctype html>
       });
 
       renderRelationshipSummary();
-      renderTableList();
       renderTableSelect();
       autoLayoutTables();
       renderDiagram();
