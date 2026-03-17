@@ -39,17 +39,11 @@ def test_build_explorer_writes_html_and_json(tmp_path: Path) -> None:
     assert "relationshipSearch" in html
     assert "relationshipSort" in html
     assert "relationshipsTableBody" in html
+    assert "Relationship Table" in html
     assert "metricAvgConfidence" in html
-    assert "joinsFoundList" in html
-    assert "missingJoinsList" in html
-    assert "unexpectedJoinsList" in html
     assert "relationshipInspector" in html
-    assert "Discovered Joins" in html
-    assert "Missing Joins" in html
-    assert "Unexpected Joins" in html
     assert "All discovered" in html
     assert "Discovered Join" in html
-    assert "No manifest.json found. Showing discovered relationships only." in html
     assert "edge-unknown" in html
     assert "attachDrag" in html
     assert "derived?.description" in html

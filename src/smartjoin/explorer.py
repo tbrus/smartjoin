@@ -1124,20 +1124,6 @@ EXPLORER_HTML = """<!doctype html>
               <div class="hint">Select an edge to inspect relationship details.</div>
             </div>
           </section>
-          <h3 id="evaluationTitle">Relationships</h3>
-          <section class="rail-section discovered" id="primaryRailSection">
-            <h4 id="primaryRailHeading">Discovered Joins</h4>
-            <div class="rail-list" id="joinsFoundList"></div>
-          </section>
-          <section class="rail-section missing" id="missingRailSection">
-            <h4>Missing Joins</h4>
-            <div class="rail-list" id="missingJoinsList"></div>
-          </section>
-          <section class="rail-section unexpected" id="unexpectedRailSection">
-            <h4>Unexpected Joins</h4>
-            <div class="rail-list" id="unexpectedJoinsList"></div>
-          </section>
-          <div class="hint is-hidden" id="evaluationHint"></div>
         </aside>
       </div>
       <section id="dataView" class="data-grid">
@@ -1256,41 +1242,9 @@ EXPLORER_HTML = """<!doctype html>
     }
 
     function configureEvaluationUI() {
-      const evaluationActive = isEvaluationOverlayActive();
-      setText("evaluationTitle", evaluationActive ? "Evaluation Overlay" : "Relationship Discovery");
-      setText("primaryRailHeading", evaluationActive ? "Joins Found" : "Discovered Joins");
-
-      const primaryRailSection = document.getElementById("primaryRailSection");
-      if (primaryRailSection) {
-        primaryRailSection.classList.toggle("found", evaluationActive);
-        primaryRailSection.classList.toggle("discovered", !evaluationActive);
-      }
-
-      setHidden("missingRailSection", !evaluationActive);
-      setHidden("unexpectedRailSection", !evaluationActive);
       setHidden("metricCardFound", !state.hasGroundTruth);
       setHidden("metricCardMissing", !state.hasGroundTruth);
       setHidden("metricCardUnexpected", !state.hasGroundTruth);
-      setHidden("evaluationHint", false);
-
-      if (evaluationActive) {
-        setText(
-          "evaluationHint",
-          "Ground-truth overlay from manifest.json is active (found/missing/unexpected)."
-        );
-        return;
-      }
-      if (state.hasGroundTruth) {
-        setText(
-          "evaluationHint",
-          "Discovery mode is active. Switch to Evaluation Overlay for found/missing/unexpected."
-        );
-        return;
-      }
-      setText(
-        "evaluationHint",
-        "No manifest.json found. Showing discovered relationships only."
-      );
     }
 
     function visualCategoryFor(rel) {
@@ -1651,22 +1605,6 @@ EXPLORER_HTML = """<!doctype html>
       return `${left} -> ${right}`;
     }
 
-    function sortStrings(items) {
-      return [...(items || [])].sort((a, b) => String(a).localeCompare(String(b)));
-    }
-
-    function dedupeStrings(items) {
-      const out = [];
-      const seen = new Set();
-      (items || []).forEach((item) => {
-        const text = String(item ?? "").trim();
-        if (!text || seen.has(text)) return;
-        seen.add(text);
-        out.push(text);
-      });
-      return out;
-    }
-
     function tableMatchesQuery(table) {
       const query = state.tableQuery.trim().toLowerCase();
       if (!query) return true;
@@ -1996,11 +1934,6 @@ EXPLORER_HTML = """<!doctype html>
         .replace(/>/g, "&gt;");
     }
 
-    function listHtml(items) {
-      if (!items || items.length === 0) return "<div class='hint'>None</div>";
-      return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
-    }
-
     function relationKey(left, right) {
       return [left, right].sort().join(" :: ");
     }
@@ -2067,10 +2000,6 @@ EXPLORER_HTML = """<!doctype html>
       configureModeOptions();
       configureEdgeModeOptions();
       configureEvaluationUI();
-      const setRail = (id, items) => {
-        const el = document.getElementById(id);
-        if (el) el.innerHTML = listHtml(items);
-      };
       const setMetric = (id, value) => {
         const el = document.getElementById(id);
         if (el) el.textContent = String(value);
@@ -2110,20 +2039,6 @@ EXPLORER_HTML = """<!doctype html>
           .map(([, label]) => label);
       } else {
         state.relationshipPool = buildRelationshipPool(new Map(), predictedJoins, false);
-      }
-
-      if (isEvaluationOverlayActive()) {
-        setRail("joinsFoundList", sortStrings(found));
-        setRail("missingJoinsList", sortStrings(missing));
-        setRail("unexpectedJoinsList", sortStrings(unexpected));
-      } else {
-        const emptyState = ["No discovered relationships at current threshold."];
-        setRail(
-          "joinsFoundList",
-          predictedMap.size ? sortStrings(Array.from(predictedMap.values())) : emptyState
-        );
-        setRail("missingJoinsList", []);
-        setRail("unexpectedJoinsList", []);
       }
 
       const visible = activeRelationships();
