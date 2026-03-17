@@ -340,10 +340,17 @@ EXPLORER_HTML = """<!doctype html>
       display:grid;
       gap:9px;
     }
+    .filters-stack{
+      gap:12px;
+    }
     .tool-row{
       display:flex;
       gap:8px;
       flex-wrap:wrap;
+      margin-top:8px;
+    }
+    .filters-stack .tool-row{
+      margin-top:12px;
     }
     .mini-btn{
       border:1px solid var(--border);
@@ -426,17 +433,6 @@ EXPLORER_HTML = """<!doctype html>
       flex-direction:column;
       gap:14px;
     }
-    .topbar{
-      margin-bottom:0;
-      display:grid;
-      gap:12px;
-      grid-template-columns:220px minmax(0,1fr);
-      align-items:end;
-    }
-    .topbar-head{
-      display:grid;
-      gap:4px;
-    }
     .dataset-badge{
       font-size:0.68rem;
       letter-spacing:0.16em;
@@ -449,27 +445,10 @@ EXPLORER_HTML = """<!doctype html>
       font-size:1.05rem;
       color:var(--ink);
       line-height:1.2;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-    .topbar-controls{
-      display:grid;
-      grid-template-columns:minmax(230px,1fr) 240px 260px;
-      gap:10px;
-      align-items:end;
-    }
-    .topbar-field{
-      min-width:0;
+      overflow-wrap:anywhere;
     }
     .search-field input[type="text"]{
       height:38px;
-    }
-    .confidence-field{
-      padding:8px 10px;
-      border:1px solid var(--border);
-      border-radius:12px;
-      background:linear-gradient(165deg, rgba(45,52,61,0.94), rgba(34,40,48,0.94));
     }
     .coverage-strip{
       margin-bottom:0;
@@ -966,12 +945,6 @@ EXPLORER_HTML = """<!doctype html>
       .metric-grid{
         grid-template-columns:repeat(4, minmax(90px, 1fr));
       }
-      .topbar{
-        grid-template-columns:1fr;
-      }
-      .topbar-controls{
-        grid-template-columns:minmax(0,1fr) 220px 240px;
-      }
       .workspace-shell{
         grid-template-columns:1fr;
       }
@@ -987,9 +960,6 @@ EXPLORER_HTML = """<!doctype html>
         box-shadow:none;
       }
       .main{padding:12px}
-      .topbar-controls{
-        grid-template-columns:1fr;
-      }
       .diagram-canvas{width:1300px;height:1000px}
       .metric-grid{
         grid-template-columns:repeat(2, minmax(120px, 1fr));
@@ -1006,13 +976,26 @@ EXPLORER_HTML = """<!doctype html>
       <h1 class="brand"><span style="color: #20b5dd;">smart</span><span style="color: #81cb8b;">join</span></h1>
       <p class="sub">Deterministic relationship discovery for structured datasets.</p>
       <section class="panel">
-        <h3>Filters</h3>
+        <h3>Dataset</h3>
         <div class="control-stack">
-          <label class="control-label" for="edgeMode">Relationship status</label>
-          <select id="edgeMode">
-            <option value="all">All discovered</option>
-            <option value="discovered">Discovered only</option>
+          <h2 class="dataset-title" id="datasetTitle">Smartjoin Dataset</h2>
+        </div>
+      </section>
+      <section class="panel">
+        <h3>Filters</h3>
+        <div class="control-stack filters-stack">
+          <label class="control-label" for="modeToggle">Mode</label>
+          <select id="modeToggle">
+            <option value="discovered">Discovery</option>
+            <option value="evaluation">Evaluation</option>
           </select>
+
+          <label class="control-label" for="confidenceRange">Min Confidence</label>
+          <input id="confidenceRange" type="range" min="0" max="1" step="0.01" value="0.75">
+          <div class="hint">Threshold: <strong id="confidenceLabel">0.75</strong></div>
+
+          <label class="control-label" for="tableSearch">Search</label>
+          <input id="tableSearch" type="text" placeholder="Search tables or columns">
 
           <label class="control-label" for="relationshipTypeFilter">Relationship type</label>
           <select id="relationshipTypeFilter">
@@ -1031,38 +1014,10 @@ EXPLORER_HTML = """<!doctype html>
             <button class="mini-btn" id="fitViewBtn">Fit Visible</button>
             <button class="mini-btn" id="clearFilterBtn">Clear Filters</button>
           </div>
-
-          <div class="hint">
-            Visible joins: <strong id="visibleJoinCount">0</strong>
-          </div>
         </div>
       </section>
     </aside>
     <main class="main">
-      <header class="topbar panel">
-        <div class="topbar-head">
-          <div class="dataset-badge">Dataset</div>
-          <h2 class="dataset-title" id="datasetTitle">Smartjoin Dataset</h2>
-        </div>
-        <div class="topbar-controls">
-          <div class="topbar-field search-field">
-            <label class="control-label" for="tableSearch">Table/column search</label>
-            <input id="tableSearch" type="text" placeholder="Search tables or columns">
-          </div>
-          <div class="topbar-field">
-            <label class="control-label" for="modeToggle">Mode</label>
-            <select id="modeToggle">
-              <option value="discovered">Discovered Relationships</option>
-              <option value="evaluation">Evaluation Overlay</option>
-            </select>
-          </div>
-          <div class="topbar-field confidence-field">
-            <label class="control-label" for="confidenceRange">Min confidence</label>
-            <input id="confidenceRange" type="range" min="0" max="1" step="0.01" value="0.75">
-            <div class="hint">Threshold: <strong id="confidenceLabel">0.75</strong></div>
-          </div>
-        </div>
-      </header>
       <section class="panel coverage-strip">
         <div class="metric-grid">
           <div class="metric-card"><span class="metric-label">Tables</span><span class="metric-value" id="metricTables">0</span></div>
@@ -2115,12 +2070,14 @@ EXPLORER_HTML = """<!doctype html>
         renderRelationshipSummary();
         renderDiagram();
       });
-      edgeModeSelect.addEventListener("change", () => {
-        state.edgeMode = edgeModeSelect.value || "all";
-        state.selectedRelationshipKey = null;
-        renderRelationshipSummary();
-        renderDiagram();
-      });
+      if (edgeModeSelect) {
+        edgeModeSelect.addEventListener("change", () => {
+          state.edgeMode = edgeModeSelect.value || "all";
+          state.selectedRelationshipKey = null;
+          renderRelationshipSummary();
+          renderDiagram();
+        });
+      }
       relationshipTypeFilter.addEventListener("change", () => {
         state.relationshipType = relationshipTypeFilter.value || "all";
         state.selectedRelationshipKey = null;
