@@ -806,6 +806,26 @@ EXPLORER_HTML = """<!doctype html>
       color:#d9e3f2;
       background:rgba(78, 92, 108, 0.34);
     }
+    .rel-pill.eval-found{
+      border-color:rgba(49,207,127,0.5);
+      color:#9df0c5;
+      background:rgba(49,207,127,0.2);
+    }
+    .rel-pill.eval-unexpected{
+      border-color:rgba(91,167,255,0.5);
+      color:#b5d8ff;
+      background:rgba(91,167,255,0.2);
+    }
+    .rel-pill.eval-missing{
+      border-color:rgba(255,98,124,0.52);
+      color:#ffb0bf;
+      background:rgba(255,98,124,0.2);
+    }
+    .rel-pill.eval-unknown{
+      border-color:rgba(146,170,201,0.45);
+      color:#d2deef;
+      background:rgba(146,170,201,0.2);
+    }
     .rel-pill.derived{
       border-color:rgba(75, 196, 255, 0.5);
       color:#b5e8ff;
@@ -1002,9 +1022,9 @@ EXPLORER_HTML = """<!doctype html>
             <option value="all">All types</option>
           </select>
 
-          <label class="control-label" for="derivedFilter">Derived filter</label>
+          <label class="control-label" for="derivedFilter">Relationship Origin</label>
           <select id="derivedFilter">
-            <option value="both">Direct + Derived</option>
+            <option value="both">All</option>
             <option value="direct">Direct only</option>
             <option value="derived">Derived only</option>
           </select>
@@ -1064,7 +1084,8 @@ EXPLORER_HTML = """<!doctype html>
                     <th>Target</th>
                     <th>Type</th>
                     <th>Conf</th>
-                    <th>Mode</th>
+                    <th>Origin</th>
+                    <th id="relationshipEvaluationHeader" class="is-hidden">Evaluation</th>
                   </tr>
                 </thead>
                 <tbody id="relationshipsTableBody">
@@ -1310,12 +1331,18 @@ EXPLORER_HTML = """<!doctype html>
     function renderRelationshipsTable() {
       const body = document.getElementById("relationshipsTableBody");
       const count = document.getElementById("relationshipTableCount");
+      const evaluationHeader = document.getElementById("relationshipEvaluationHeader");
       if (!body) return;
+      const showEvaluationStatus = isEvaluationOverlayActive();
+      if (evaluationHeader) {
+        evaluationHeader.classList.toggle("is-hidden", !showEvaluationStatus);
+      }
       const rows = sortedFilteredRelationshipsForTable();
       if (count) count.textContent = String(rows.length);
 
       if (rows.length === 0) {
-        body.innerHTML = `<tr><td colspan="5" class="hint">No relationships match current filters.</td></tr>`;
+        const emptyColumns = showEvaluationStatus ? 6 : 5;
+        body.innerHTML = `<tr><td colspan="${emptyColumns}" class="hint">No relationships match current filters.</td></tr>`;
         return;
       }
 
@@ -1329,12 +1356,24 @@ EXPLORER_HTML = """<!doctype html>
         }
         const derivedLabel = rel.derived ? "Derived" : "Direct";
         const confidence = Number(rel.confidence || 0).toFixed(3);
+        const evalStatus = String(rel.category || "unknown").toLowerCase();
+        const evalLabelMap = {
+          found: "Found",
+          unexpected: "Unexpected",
+          missing: "Missing",
+          unknown: "Unknown",
+        };
+        const evalLabel = evalLabelMap[evalStatus] || "Unknown";
+        const evaluationCell = showEvaluationStatus
+          ? `<td><span class="rel-pill eval-${escapeHtml(evalStatus)}">${escapeHtml(evalLabel)}</span></td>`
+          : "";
         tr.innerHTML = `
           <td>${escapeHtml(parts.left)}</td>
           <td>${escapeHtml(parts.right)}</td>
           <td>${escapeHtml(String(rel.relationship_guess || "unknown"))}</td>
           <td>${confidence}</td>
           <td><span class="rel-pill ${rel.derived ? "derived" : ""}">${derivedLabel}</span></td>
+          ${evaluationCell}
         `;
         tr.addEventListener("click", () => {
           state.selectedRelationshipKey = key;
