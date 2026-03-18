@@ -635,6 +635,12 @@ EXPLORER_HTML = """<!doctype html>
       color:#b9e9ff;
       font-weight:600;
     }
+    .column-list li.edge-hover-col{
+      background:rgba(75, 196, 255, 0.3);
+      color:#d8f3ff;
+      font-weight:700;
+      box-shadow:inset 0 0 0 1px rgba(116, 217, 255, 0.52);
+    }
     .data-grid,.truth-grid{
       border:1px solid var(--border);
       border-radius:16px;
@@ -1660,6 +1666,69 @@ EXPLORER_HTML = """<!doctype html>
       return map;
     }
 
+    function buildColumnRelationshipIndex(relationships) {
+      const index = new Map();
+      relationships.forEach((rel) => {
+        const leftRef = `${rel.left_table}.${rel.left_column}`;
+        const rightRef = `${rel.right_table}.${rel.right_column}`;
+        if (!index.has(leftRef)) index.set(leftRef, []);
+        if (!index.has(rightRef)) index.set(rightRef, []);
+        index.get(leftRef).push({ from: leftRef, to: rightRef, rel });
+        index.get(rightRef).push({ from: rightRef, to: leftRef, rel });
+      });
+      return index;
+    }
+
+    function showColumnTooltip(columnRef, links, event) {
+      if (!tooltipEl) return;
+      const maxItems = 8;
+      const rows = links
+        .slice(0, maxItems)
+        .map((item) => {
+          const conf = formatPercent(item.rel?.confidence || 0, 0);
+          return `<div>${escapeHtml(item.from)} -> ${escapeHtml(item.to)} <span style="color:#a8b0bc;">(${conf})</span></div>`;
+        })
+        .join("");
+      const overflow = links.length > maxItems ? `<div style="margin-top:4px; color:#a8b0bc;">+${links.length - maxItems} more</div>` : "";
+      const body = rows || `<div style="color:#a8b0bc;">No visible relationships.</div>`;
+      tooltipEl.innerHTML = `
+        <div style="font-weight:650; margin-bottom:4px;">${escapeHtml(columnRef)}</div>
+        ${body}
+        ${overflow}
+      `;
+      positionTooltip(event);
+      tooltipEl.style.display = "block";
+    }
+
+    function attachColumnHover(card, tableName, canvas, columnRelationshipIndex) {
+      const columns = card.querySelectorAll("li[data-column]");
+      columns.forEach((columnEl) => {
+        columnEl.addEventListener("pointerenter", (event) => {
+          clearEdgeHoverColumns(canvas);
+          const columnName = String(columnEl.dataset.column || "");
+          const columnRef = `${tableName}.${columnName}`;
+          columnEl.classList.add("edge-hover-col");
+          const links = columnRelationshipIndex.get(columnRef) || [];
+          links.forEach((item) => {
+            const target = splitRef(item.to);
+            if (!target.table || !target.column) return;
+            const targetEl = findColumnElement(canvas, target.table, target.column);
+            if (targetEl) targetEl.classList.add("edge-hover-col");
+          });
+          showColumnTooltip(columnRef, links, event);
+        });
+        columnEl.addEventListener("pointermove", (event) => {
+          if (tooltipEl && tooltipEl.style.display === "block") {
+            positionTooltip(event);
+          }
+        });
+        columnEl.addEventListener("pointerleave", () => {
+          clearEdgeHoverColumns(canvas);
+          if (tooltipEl) tooltipEl.style.display = "none";
+        });
+      });
+    }
+
     function buildCard(table, joinCols) {
       const card = document.createElement("article");
       card.className = "table-card";
@@ -1695,6 +1764,7 @@ EXPLORER_HTML = """<!doctype html>
     }
 
     function drawEdges(relationships, canvas, edgeLayer) {
+      clearEdgeHoverColumns(canvas);
       edgeLayer.innerHTML = "";
       const width = canvas.clientWidth || 1800;
       const height = canvas.clientHeight || 1200;
@@ -1748,20 +1818,29 @@ EXPLORER_HTML = """<!doctype html>
         path.dataset.edge = JSON.stringify(rel);
         path.style.pointerEvents = "stroke";
         path.addEventListener("click", () => {
+          clearEdgeHoverColumns(canvas);
           state.selectedRelationshipKey = relKey;
           refreshSelectedRelationshipViews();
         });
-        if (tooltipEl) {
-          path.addEventListener("pointerenter", (event) => {
+        path.addEventListener("pointerenter", (event) => {
+          clearEdgeHoverColumns(canvas);
+          if (leftEl) leftEl.classList.add("edge-hover-col");
+          if (rightEl) rightEl.classList.add("edge-hover-col");
+          if (tooltipEl) {
             showTooltip(rel, truthState, event);
-          });
-          path.addEventListener("pointermove", (event) => {
+          }
+        });
+        path.addEventListener("pointermove", (event) => {
+          if (tooltipEl) {
             positionTooltip(event);
-          });
-          path.addEventListener("pointerleave", () => {
+          }
+        });
+        path.addEventListener("pointerleave", () => {
+          clearEdgeHoverColumns(canvas);
+          if (tooltipEl) {
             tooltipEl.style.display = "none";
-          });
-        }
+          }
+        });
         edgeLayer.appendChild(path);
       });
     }
@@ -1786,6 +1865,13 @@ EXPLORER_HTML = """<!doctype html>
         }
       }
       return null;
+    }
+
+    function clearEdgeHoverColumns(canvas) {
+      if (!canvas) return;
+      canvas.querySelectorAll(".column-list li.edge-hover-col").forEach((el) => {
+        el.classList.remove("edge-hover-col");
+      });
     }
 
     function findTableCard(canvas, tableName) {
@@ -1907,6 +1993,7 @@ EXPLORER_HTML = """<!doctype html>
       state.currentRelationships = joins;
       updateVisibleJoinCount(joins);
       const colsByTable = relationshipColumnsByTable();
+      const columnRelationshipIndex = buildColumnRelationshipIndex(joins);
       const matchingTables = refreshMatchingTables();
       const hasTableQuery = Boolean(state.tableQuery.trim());
 
@@ -1919,6 +2006,7 @@ EXPLORER_HTML = """<!doctype html>
         state.tablePositions[table.name] = pos;
         positionCard(card, pos.x, pos.y);
         canvas.appendChild(card);
+        attachColumnHover(card, table.name, canvas, columnRelationshipIndex);
         attachDrag(card, canvas, edgeLayer);
       });
       requestAnimationFrame(() => drawEdges(joins, canvas, edgeLayer));
