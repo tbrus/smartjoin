@@ -747,10 +747,14 @@ EXPLORER_HTML = """<!doctype html>
       margin:0;
     }
     .relationships-toolbar{
-      display:grid;
-      grid-template-columns:minmax(0,1fr) 170px;
-      gap:8px;
+      display:flex;
+      justify-content:flex-end;
+      align-items:center;
       margin-bottom:8px;
+    }
+    .relationships-toolbar select{
+      width:220px;
+      max-width:100%;
     }
     .relationships-table-wrap{
       border:1px solid rgba(130,152,182,0.2);
@@ -995,7 +999,10 @@ EXPLORER_HTML = """<!doctype html>
         grid-template-columns:repeat(2, minmax(120px, 1fr));
       }
       .relationships-toolbar{
-        grid-template-columns:1fr;
+        justify-content:flex-start;
+      }
+      .relationships-toolbar select{
+        width:100%;
       }
     }
   </style>
@@ -1026,6 +1033,7 @@ EXPLORER_HTML = """<!doctype html>
 
           <label class="control-label" for="tableSearch">Search</label>
           <input id="tableSearch" type="text" placeholder="Search tables or columns">
+          <div id="tableSearchActiveNote" class="hint is-hidden">Filtering is on across graph and relationship table.</div>
 
           <label class="control-label" for="relationshipTypeFilter">Relationship type</label>
           <select id="relationshipTypeFilter">
@@ -1077,7 +1085,6 @@ EXPLORER_HTML = """<!doctype html>
               <div class="hint">Rows: <strong id="relationshipTableCount">0</strong></div>
             </div>
             <div class="relationships-toolbar">
-              <input id="relationshipSearch" type="text" placeholder="Filter relationships">
               <select id="relationshipSort">
                 <option value="confidence_desc">Confidence high->low</option>
                 <option value="confidence_asc">Confidence low->high</option>
@@ -1136,7 +1143,6 @@ EXPLORER_HTML = """<!doctype html>
       viewerMode: "discovered",
       relationshipType: "all",
       derivedMode: "both",
-      relationshipSearch: "",
       relationshipSort: "confidence_desc",
       hasGroundTruth: false,
       selectedRelationshipKey: null,
@@ -1253,6 +1259,7 @@ EXPLORER_HTML = """<!doctype html>
 
     function activeRelationships() {
       const matchingTables = refreshMatchingTables();
+      const hasTableQuery = Boolean(state.tableQuery.trim());
       return state.relationshipPool.filter((rel) => {
         const visualCategory = visualCategoryFor(rel);
         if (visualCategory === "hidden") {
@@ -1271,10 +1278,11 @@ EXPLORER_HTML = """<!doctype html>
         if (state.derivedMode === "derived" && !isDerived) {
           return false;
         }
-        if (matchingTables.size > 0) {
-          if (!(matchingTables.has(rel.left_table) || matchingTables.has(rel.right_table))) {
-            return false;
-          }
+        if (
+          hasTableQuery &&
+          !(matchingTables.has(rel.left_table) && matchingTables.has(rel.right_table))
+        ) {
+          return false;
         }
         if (state.edgeMode !== "all" && visualCategory !== state.edgeMode) {
           return false;
@@ -1313,16 +1321,7 @@ EXPLORER_HTML = """<!doctype html>
     }
 
     function sortedFilteredRelationshipsForTable() {
-      const query = state.relationshipSearch.trim().toLowerCase();
       let rows = [...activeRelationships()];
-      if (query) {
-        rows = rows.filter((rel) => {
-          const parts = relationshipLabelParts(rel);
-          const haystack = `${parts.left} ${parts.right} ${rel.relationship_guess || ""}`.toLowerCase();
-          return haystack.includes(query);
-        });
-      }
-
       const sortMode = state.relationshipSort || "confidence_desc";
       rows.sort((a, b) => {
         if (sortMode === "confidence_asc") {
@@ -1647,6 +1646,12 @@ EXPLORER_HTML = """<!doctype html>
       return set;
     }
 
+    function updateTableSearchNote() {
+      const note = document.getElementById("tableSearchActiveNote");
+      if (!note) return;
+      note.classList.toggle("is-hidden", !state.tableQuery.trim());
+    }
+
     function relationshipColumnsByTable() {
       const map = new Map();
       activeRelationships().forEach((rel) => {
@@ -1852,13 +1857,14 @@ EXPLORER_HTML = """<!doctype html>
 
     function autoLayoutTables() {
       const matching = refreshMatchingTables();
+      const hasTableQuery = Boolean(state.tableQuery.trim());
       const tableDegree = new Map();
       activeRelationships().forEach((join) => {
         tableDegree.set(join.left_table, (tableDegree.get(join.left_table) || 0) + 1);
         tableDegree.set(join.right_table, (tableDegree.get(join.right_table) || 0) + 1);
       });
       const ordered = [...state.payload.tables]
-        .filter((table) => matching.size === 0 || matching.has(table.name))
+        .filter((table) => !hasTableQuery || matching.has(table.name))
         .sort((a, b) => {
           const da = tableDegree.get(a.name) || 0;
           const db = tableDegree.get(b.name) || 0;
@@ -1905,15 +1911,16 @@ EXPLORER_HTML = """<!doctype html>
       updateVisibleJoinCount(joins);
       const colsByTable = relationshipColumnsByTable();
       const matchingTables = refreshMatchingTables();
+      const hasTableQuery = Boolean(state.tableQuery.trim());
 
       state.payload.tables.forEach((table, index) => {
+        if (hasTableQuery && !matchingTables.has(table.name)) {
+          return;
+        }
         const card = buildCard(table, colsByTable.get(table.name));
         const pos = state.tablePositions[table.name] || layoutPosition(index, state.payload.tables.length);
         state.tablePositions[table.name] = pos;
         positionCard(card, pos.x, pos.y);
-        if (state.tableQuery.trim() && !matchingTables.has(table.name)) {
-          card.classList.add("dimmed");
-        }
         canvas.appendChild(card);
         attachDrag(card, canvas, edgeLayer);
       });
@@ -2104,7 +2111,6 @@ EXPLORER_HTML = """<!doctype html>
       const edgeModeSelect = document.getElementById("edgeMode");
       const relationshipTypeFilter = document.getElementById("relationshipTypeFilter");
       const derivedFilter = document.getElementById("derivedFilter");
-      const relationshipSearchInput = document.getElementById("relationshipSearch");
       const relationshipSortSelect = document.getElementById("relationshipSort");
       const relayoutBtn = document.getElementById("relayoutBtn");
       const fitViewBtn = document.getElementById("fitViewBtn");
@@ -2118,8 +2124,8 @@ EXPLORER_HTML = """<!doctype html>
       configureRelationshipTypeOptions();
       configureEdgeModeOptions();
       configureEvaluationUI();
-      state.relationshipSearch = relationshipSearchInput?.value || "";
       state.relationshipSort = relationshipSortSelect?.value || "confidence_desc";
+      updateTableSearchNote();
       slider.value = String(state.payload.meta.min_confidence ?? 0.75);
       state.threshold = Number(slider.value);
       label.textContent = formatPercent(slider.value, 0);
@@ -2139,6 +2145,7 @@ EXPLORER_HTML = """<!doctype html>
       });
       searchInput.addEventListener("input", () => {
         state.tableQuery = searchInput.value || "";
+        updateTableSearchNote();
         state.selectedRelationshipKey = null;
         renderRelationshipSummary();
         renderDiagram();
@@ -2163,10 +2170,6 @@ EXPLORER_HTML = """<!doctype html>
         renderRelationshipSummary();
         renderDiagram();
       });
-      relationshipSearchInput.addEventListener("input", () => {
-        state.relationshipSearch = relationshipSearchInput.value || "";
-        renderRelationshipsTable();
-      });
       relationshipSortSelect.addEventListener("change", () => {
         state.relationshipSort = relationshipSortSelect.value || "confidence_desc";
         renderRelationshipsTable();
@@ -2184,15 +2187,14 @@ EXPLORER_HTML = """<!doctype html>
         state.edgeMode = "all";
         state.relationshipType = "all";
         state.derivedMode = "both";
-        state.relationshipSearch = "";
         state.relationshipSort = "confidence_desc";
         state.viewerMode = state.hasGroundTruth ? state.viewerMode : "discovered";
         state.selectedRelationshipKey = null;
         searchInput.value = "";
+        updateTableSearchNote();
         modeToggle.value = state.viewerMode;
         relationshipTypeFilter.value = "all";
         derivedFilter.value = "both";
-        relationshipSearchInput.value = "";
         relationshipSortSelect.value = "confidence_desc";
         renderRelationshipSummary();
         renderDiagram();
