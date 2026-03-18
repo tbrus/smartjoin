@@ -1128,7 +1128,7 @@ EXPLORER_HTML = """<!doctype html>
       </section>
     </main>
   </div>
-  <div id="edgeTooltip" class="edge-tooltip">Hover an edge to inspect the relationship.</div>
+  <div id="edgeTooltip" class="edge-tooltip">Select an edge to inspect relationship details.</div>
   <script id="smartjoinEmbeddedData" type="application/json">__SMARTJOIN_EMBEDDED_DATA__</script>
   <script>
     const state = {
@@ -1618,7 +1618,7 @@ EXPLORER_HTML = """<!doctype html>
 
     function showTooltip(rel, truthState, event) {
       if (!tooltipEl) return;
-      tooltipEl.innerHTML = formatTooltipContent(rel, truthState);
+      tooltipEl.textContent = "Select an edge to inspect relationship details.";
       positionTooltip(event);
       tooltipEl.style.display = "block";
     }
