@@ -1082,7 +1082,6 @@ EXPLORER_HTML = """<!doctype html>
           <section class="rail-section">
             <div class="relationships-head">
               <h4>Relationship Table</h4>
-              <div class="hint">Rows: <strong id="relationshipTableCount">0</strong></div>
             </div>
             <div class="relationships-toolbar">
               <select id="relationshipSort">
@@ -1347,7 +1346,6 @@ EXPLORER_HTML = """<!doctype html>
 
     function renderRelationshipsTable() {
       const body = document.getElementById("relationshipsTableBody");
-      const count = document.getElementById("relationshipTableCount");
       const evaluationHeader = document.getElementById("relationshipEvaluationHeader");
       if (!body) return;
       const showEvaluationStatus = isEvaluationOverlayActive();
@@ -1355,7 +1353,6 @@ EXPLORER_HTML = """<!doctype html>
         evaluationHeader.classList.toggle("is-hidden", !showEvaluationStatus);
       }
       const rows = sortedFilteredRelationshipsForTable();
-      if (count) count.textContent = String(rows.length);
 
       if (rows.length === 0) {
         const emptyColumns = showEvaluationStatus ? 6 : 5;
