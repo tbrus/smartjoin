@@ -1022,7 +1022,7 @@ EXPLORER_HTML = """<!doctype html>
 
           <label class="control-label" for="confidenceRange">Min Confidence</label>
           <input id="confidenceRange" type="range" min="0" max="1" step="0.01" value="0.75">
-          <div class="hint">Threshold: <strong id="confidenceLabel">0.75</strong></div>
+          <div class="hint">Threshold: <strong id="confidenceLabel">75%</strong></div>
 
           <label class="control-label" for="tableSearch">Search</label>
           <input id="tableSearch" type="text" placeholder="Search tables or columns">
@@ -1051,13 +1051,13 @@ EXPLORER_HTML = """<!doctype html>
       <section class="panel coverage-strip">
         <div class="metric-grid">
           <div class="metric-card"><span class="metric-label">Tables</span><span class="metric-value" id="metricTables">0</span></div>
-          <div class="metric-card"><span class="metric-label">Visible Joins</span><span class="metric-value" id="metricVisible">0</span></div>
-          <div class="metric-card"><span class="metric-label">Derived Joins</span><span class="metric-value" id="metricDerived">0</span></div>
-          <div class="metric-card"><span class="metric-label">Avg Confidence</span><span class="metric-value" id="metricAvgConfidence">0.00</span></div>
+          <div class="metric-card"><span class="metric-label">Visible Relationships</span><span class="metric-value" id="metricVisible">0</span></div>
+          <div class="metric-card" id="metricCardDerived"><span class="metric-label">Derived Joins</span><span class="metric-value" id="metricDerived">0</span></div>
+          <div class="metric-card"><span class="metric-label">Avg Confidence</span><span class="metric-value" id="metricAvgConfidence">0%</span></div>
           <div class="metric-card" id="metricCardFound"><span class="metric-label">Found</span><span class="metric-value" id="metricFound">0</span></div>
           <div class="metric-card" id="metricCardMissing"><span class="metric-label">Missing</span><span class="metric-value" id="metricMissing">0</span></div>
           <div class="metric-card" id="metricCardUnexpected"><span class="metric-label">Unexpected</span><span class="metric-value" id="metricUnexpected">0</span></div>
-          <div class="metric-card"><span class="metric-label">Threshold</span><span class="metric-value" id="metricThreshold">0.75</span></div>
+          <div class="metric-card" id="metricCardThreshold"><span class="metric-label">Threshold</span><span class="metric-value" id="metricThreshold">75%</span></div>
         </div>
       </section>
       <div class="workspace-shell">
@@ -1145,6 +1145,11 @@ EXPLORER_HTML = """<!doctype html>
     const tooltipEl = document.getElementById("edgeTooltip");
 
     const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+    const formatPercent = (value, decimals = 0) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "0%";
+      return `${(numeric * 100).toFixed(decimals)}%`;
+    };
 
     function tableByName(name) {
       return state.payload.tables.find((t) => t.name === name);
@@ -1228,9 +1233,12 @@ EXPLORER_HTML = """<!doctype html>
     }
 
     function configureEvaluationUI() {
-      setHidden("metricCardFound", !state.hasGroundTruth);
-      setHidden("metricCardMissing", !state.hasGroundTruth);
-      setHidden("metricCardUnexpected", !state.hasGroundTruth);
+      const showEvaluationMetrics = isEvaluationOverlayActive();
+      setHidden("metricCardFound", !showEvaluationMetrics);
+      setHidden("metricCardMissing", !showEvaluationMetrics);
+      setHidden("metricCardUnexpected", !showEvaluationMetrics);
+      setHidden("metricCardDerived", true);
+      setHidden("metricCardThreshold", true);
     }
 
     function visualCategoryFor(rel) {
@@ -1365,7 +1373,7 @@ EXPLORER_HTML = """<!doctype html>
           tr.classList.add("selected");
         }
         const derivedLabel = rel.derived ? "Derived" : "Direct";
-        const confidence = Number(rel.confidence || 0).toFixed(3);
+        const confidence = formatPercent(rel.confidence || 0, 0);
         const evalStatus = String(rel.category || "unknown").toLowerCase();
         const evalLabelMap = {
           found: "Found",
@@ -1405,7 +1413,7 @@ EXPLORER_HTML = """<!doctype html>
       const left = `${rel.left_table}.${rel.left_column}`;
       const right = `${rel.right_table}.${rel.right_column}`;
       const status = visualCategoryFor(rel);
-      const confidence = Number(rel.confidence || 0).toFixed(3);
+      const confidence = formatPercent(rel.confidence || 0, 0);
       const originLabel = rel.derived ? "Derived" : "Direct";
       const originBadgeClass = rel.derived ? "derived" : "direct";
       const isEvaluationMode = isEvaluationOverlayActive();
@@ -1427,7 +1435,7 @@ EXPLORER_HTML = """<!doctype html>
       const signals = Object.entries(rel.breakdown?.signals || {})
         .map(
           ([name, value]) =>
-            `<li><strong>${escapeHtml(name)}</strong>: ${Number(value).toFixed(3)}</li>`
+            `<li><strong>${escapeHtml(name)}</strong>: ${formatPercent(value, 0)}</li>`
         )
         .join("");
       const sourceExamples = (rel.example_mappings || [])
@@ -1590,12 +1598,12 @@ EXPLORER_HTML = """<!doctype html>
         `
         : "";
       const signals = Object.entries(rel.breakdown?.signals || {})
-        .map(([k, v]) => `<div><strong>${k}</strong>: ${Number(v).toFixed(3)}</div>`)
+        .map(([k, v]) => `<div><strong>${k}</strong>: ${formatPercent(v, 0)}</div>`)
         .join("");
       return `
         <div style="font-weight:600; margin-bottom:4px;">${label}</div>
         <div>${left} -> ${right}</div>
-        <div style="margin-top:6px; font-size:0.78rem;">confidence: ${rel.confidence.toFixed(3)}</div>
+        <div style="margin-top:6px; font-size:0.78rem;">confidence: ${formatPercent(rel.confidence || 0, 0)}</div>
         <div style="font-size:0.78rem;">relationship: ${rel.relationship_guess}</div>
         ${derivedSection}
         ${originalSection}
@@ -2023,7 +2031,7 @@ EXPLORER_HTML = """<!doctype html>
         if (el) el.textContent = String(value);
       };
 
-      setMetric("metricThreshold", state.threshold.toFixed(2));
+      setMetric("metricThreshold", formatPercent(state.threshold, 0));
       const predictedJoins = state.payload.report.joins || [];
       const predictedAtThreshold = predictedJoins.filter(
         (join) => Number(join.confidence || 0) >= state.threshold
@@ -2072,7 +2080,7 @@ EXPLORER_HTML = """<!doctype html>
       setMetric("metricTables", state.payload.tables.length);
       setMetric("metricVisible", visible.length);
       setMetric("metricDerived", derivedCount);
-      setMetric("metricAvgConfidence", avgConfidence.toFixed(2));
+      setMetric("metricAvgConfidence", formatPercent(avgConfidence, 0));
       setMetric("metricFound", found.length);
       setMetric("metricMissing", missing.length);
       setMetric("metricUnexpected", unexpected.length);
@@ -2114,10 +2122,10 @@ EXPLORER_HTML = """<!doctype html>
       state.relationshipSort = relationshipSortSelect?.value || "confidence_desc";
       slider.value = String(state.payload.meta.min_confidence ?? 0.75);
       state.threshold = Number(slider.value);
-      label.textContent = Number(slider.value).toFixed(2);
+      label.textContent = formatPercent(slider.value, 0);
       slider.addEventListener("input", () => {
         state.threshold = Number(slider.value);
-        label.textContent = Number(slider.value).toFixed(2);
+        label.textContent = formatPercent(slider.value, 0);
         state.selectedRelationshipKey = null;
         renderRelationshipSummary();
         renderDiagram();
