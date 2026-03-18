@@ -496,7 +496,7 @@ EXPLORER_HTML = """<!doctype html>
     }
     .workspace-shell{
       display:grid;
-      grid-template-columns:minmax(0,1fr) 420px;
+      grid-template-columns:minmax(0,2fr) minmax(0,1fr);
       gap:14px;
       align-items:flex-start;
       margin-bottom:14px;
@@ -939,6 +939,16 @@ EXPLORER_HTML = """<!doctype html>
       background:rgba(127,147,178,0.2);
       color:#cedaf0;
       border:1px solid rgba(127,147,178,0.42);
+    }
+    .truth-badge.direct{
+      background:rgba(127,147,178,0.2);
+      color:#cedaf0;
+      border:1px solid rgba(127,147,178,0.42);
+    }
+    .truth-badge.derived{
+      background:rgba(75,196,255,0.18);
+      color:#b5e8ff;
+      border:1px solid rgba(75,196,255,0.44);
     }
     .is-hidden{
       display:none !important;
@@ -1396,8 +1406,23 @@ EXPLORER_HTML = """<!doctype html>
       const right = `${rel.right_table}.${rel.right_column}`;
       const status = visualCategoryFor(rel);
       const confidence = Number(rel.confidence || 0).toFixed(3);
-      const modeLabel = rel.derived ? "Derived" : "Direct";
-      const derivedDescription = rel.derived?.description || rel.derived?.transform_id || "n/a";
+      const originLabel = rel.derived ? "Derived" : "Direct";
+      const originBadgeClass = rel.derived ? "derived" : "direct";
+      const isEvaluationMode = isEvaluationOverlayActive();
+      const statusLabelMap = {
+        found: "Found",
+        unexpected: "Unexpected",
+        missing: "Missing",
+        unknown: "Unknown",
+      };
+      const evaluationLabel = statusLabelMap[status] || "Unknown";
+      const evaluationBadge = isEvaluationMode
+        ? `<div class="truth-badge ${escapeHtml(status)}">${escapeHtml(evaluationLabel)}</div>`
+        : "";
+      const derivedDescription = rel.derived?.description || rel.derived?.transform_id || "";
+      const derivedTransformLine = rel.derived
+        ? `<div><strong>Derived Transform</strong>${escapeHtml(String(derivedDescription))}</div>`
+        : "";
       const derivedParams = rel.derived?.params ? JSON.stringify(rel.derived.params) : "";
       const signals = Object.entries(rel.breakdown?.signals || {})
         .map(
@@ -1405,7 +1430,7 @@ EXPLORER_HTML = """<!doctype html>
             `<li><strong>${escapeHtml(name)}</strong>: ${Number(value).toFixed(3)}</li>`
         )
         .join("");
-      const examples = (rel.example_mappings || [])
+      const sourceExamples = (rel.example_mappings || [])
         .slice(0, 3)
         .map(
           (item) =>
@@ -1419,16 +1444,20 @@ EXPLORER_HTML = """<!doctype html>
             `<li>${escapeHtml(String(item?.from ?? ""))} -> ${escapeHtml(String(item?.to ?? ""))}</li>`
         )
         .join("");
+      const combinedExamples = `${sourceExamples}${derivedExamples}`;
 
       target.innerHTML = `
         <div class="inspector-block">
-          <div class="truth-badge ${escapeHtml(status)}">${escapeHtml(status)}</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+            <div class="truth-badge ${escapeHtml(originBadgeClass)}">${escapeHtml(originLabel)}</div>
+            ${evaluationBadge}
+          </div>
           <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(left)} -> ${escapeHtml(right)}</div>
           <div class="inspector-grid">
             <div><strong>Confidence</strong>${confidence}</div>
             <div><strong>Relationship</strong>${escapeHtml(String(rel.relationship_guess || "unknown"))}</div>
-            <div><strong>Mode</strong>${modeLabel}</div>
-            <div><strong>Derived Transform</strong>${escapeHtml(String(derivedDescription))}</div>
+            <div><strong>Origin</strong>${originLabel}</div>
+            ${derivedTransformLine}
           </div>
           ${derivedParams ? `<div class="hint" style="margin-top:6px;">params: ${escapeHtml(derivedParams)}</div>` : ""}
         </div>
@@ -1437,13 +1466,8 @@ EXPLORER_HTML = """<!doctype html>
           <ul class="inspector-list">${signals || "<li>none</li>"}</ul>
         </div>
         <div class="inspector-block">
-          <strong style="display:block; margin-bottom:4px;">Sample Examples</strong>
-          <ul class="inspector-list">${examples || "<li>none</li>"}</ul>
-          ${
-            derivedExamples
-              ? `<strong style="display:block; margin:8px 0 4px;">Derived Examples</strong><ul class="inspector-list">${derivedExamples}</ul>`
-              : ""
-          }
+          <strong style="display:block; margin-bottom:4px;">Examples</strong>
+          <ul class="inspector-list">${combinedExamples || "<li>none</li>"}</ul>
         </div>
       `;
     }
