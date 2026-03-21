@@ -63,21 +63,28 @@ def _write_json(path: Path, frame: pl.DataFrame) -> None:
 def _write_xlsx(path: Path, frame: pl.DataFrame) -> None:
     try:
         import pandas as pd
-    except ImportError:
-        # Fallback path keeps conversion available even without pandas.
-        from openpyxl import Workbook
+    except Exception:
+        pd = None
 
-        workbook = Workbook()
-        worksheet = workbook.active
-        worksheet.title = "Data"
-        worksheet.append(list(frame.columns))
-        for row in frame.iter_rows():
-            worksheet.append(list(row))
-        workbook.save(path)
-        return
+    if pd is not None:
+        try:
+            with pd.ExcelWriter(path, engine="openpyxl") as writer:
+                pd.DataFrame(frame.to_dicts()).to_excel(writer, index=False, sheet_name="Data")
+            return
+        except Exception:
+            # Fall back to direct openpyxl writing if pandas/openpyxl interop fails.
+            pass
 
-    with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        pd.DataFrame(frame.to_dicts()).to_excel(writer, index=False, sheet_name="Data")
+    # Fallback path keeps conversion available even without pandas.
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Data"
+    worksheet.append(list(frame.columns))
+    for row in frame.iter_rows():
+        worksheet.append(list(row))
+    workbook.save(path)
 
 
 def _convert_csv(path: Path, target_ext: str) -> Path:

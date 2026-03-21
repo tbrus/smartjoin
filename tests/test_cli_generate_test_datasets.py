@@ -18,6 +18,24 @@ def _emitted_table_formats(domain_dir: Path) -> set[str]:
     return {path.suffix.lower() for path in files}
 
 
+def _run_checked(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+) -> None:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"Command failed: {' '.join(command)}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+    )
+
+
 def test_cli_generate_test_datasets_command(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     output_root = tmp_path / "datasets"
@@ -30,7 +48,7 @@ def test_cli_generate_test_datasets_command(tmp_path: Path) -> None:
         else f"{repo_root / 'src'}{os.pathsep}{existing_pythonpath}"
     )
 
-    subprocess.run(
+    _run_checked(
         [
             sys.executable,
             "-m",
@@ -53,11 +71,8 @@ def test_cli_generate_test_datasets_command(tmp_path: Path) -> None:
             "--avg-items-per-order",
             "2.0",
         ],
-        check=True,
         cwd=repo_root,
         env=env,
-        capture_output=True,
-        text=True,
     )
 
     retail_dir = output_root / "retail"
@@ -82,7 +97,7 @@ def test_cli_generate_test_datasets_all_domains_with_derived_flags(tmp_path: Pat
         else f"{repo_root / 'src'}{os.pathsep}{existing_pythonpath}"
     )
 
-    subprocess.run(
+    _run_checked(
         [
             sys.executable,
             "-m",
@@ -110,11 +125,8 @@ def test_cli_generate_test_datasets_all_domains_with_derived_flags(tmp_path: Pat
             "--max-json-records",
             "123",
         ],
-        check=True,
         cwd=repo_root,
         env=env,
-        capture_output=True,
-        text=True,
     )
 
     generation_manifest = json.loads(
@@ -155,7 +167,7 @@ def test_cli_generate_test_datasets_derived_domain(tmp_path: Path) -> None:
         else f"{repo_root / 'src'}{os.pathsep}{existing_pythonpath}"
     )
 
-    subprocess.run(
+    _run_checked(
         [
             sys.executable,
             "-m",
@@ -170,11 +182,8 @@ def test_cli_generate_test_datasets_derived_domain(tmp_path: Path) -> None:
             "--profile",
             "tiny",
         ],
-        check=True,
         cwd=repo_root,
         env=env,
-        capture_output=True,
-        text=True,
     )
 
     derived_dir = output_root / "derived"

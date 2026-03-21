@@ -141,12 +141,15 @@ def _load_xlsx_openpyxl(
 def _load_xlsx(path: Path, sheet_name: str | None = None) -> list[tuple[str, pl.DataFrame]]:
     try:
         import pandas as pd
-    except ImportError:
+    except Exception:
         return _load_xlsx_openpyxl(path, sheet_name=sheet_name)
 
     # No explicit sheet means read all workbook sheets.
     target_sheet: str | None = sheet_name if sheet_name is not None else None
-    loaded = pd.read_excel(path, sheet_name=target_sheet)
+    try:
+        loaded = pd.read_excel(path, sheet_name=target_sheet)
+    except Exception:
+        return _load_xlsx_openpyxl(path, sheet_name=sheet_name)
     if isinstance(loaded, dict):
         return [(str(name), _normalize_pandas_frame(frame)) for name, frame in loaded.items()]
     resolved = str(sheet_name if sheet_name is not None else 0)

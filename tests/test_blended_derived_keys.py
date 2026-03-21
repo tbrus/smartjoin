@@ -12,6 +12,18 @@ def _contains_derived_pattern(values: list[str]) -> bool:
     return any(pattern.search(value.strip().lower()) for value in values if value)
 
 
+def _run_checked(command: list[str], *, cwd: Path) -> None:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"Command failed: {' '.join(command)}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+    )
+
+
 def _read_table_column(dataset_dir: Path, table_name: str, column: str) -> list[str]:
     tables = load_tables(dataset_dir)
     by_name = {table.name: table for table in tables}
@@ -25,7 +37,7 @@ def _read_table_column(dataset_dir: Path, table_name: str, column: str) -> list[
 def test_retail_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     out_root = tmp_path / "datasets"
-    subprocess.run(
+    _run_checked(
         [
             sys.executable,
             "scripts/test_datasets/run.py",
@@ -42,10 +54,7 @@ def test_retail_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> 
             "--pct-derived-both-sides",
             "0.7",
         ],
-        check=True,
         cwd=repo_root,
-        capture_output=True,
-        text=True,
     )
 
     retail_dir = out_root / "retail"
@@ -65,7 +74,7 @@ def test_retail_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> 
 def test_health_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     out_root = tmp_path / "datasets"
-    subprocess.run(
+    _run_checked(
         [
             sys.executable,
             "scripts/test_datasets/run.py",
@@ -82,10 +91,7 @@ def test_health_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> 
             "--pct-derived-both-sides",
             "0.7",
         ],
-        check=True,
         cwd=repo_root,
-        capture_output=True,
-        text=True,
     )
 
     health_dir = out_root / "health"
@@ -105,7 +111,7 @@ def test_health_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> 
 def test_saas_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     out_root = tmp_path / "datasets"
-    subprocess.run(
+    _run_checked(
         [
             sys.executable,
             "scripts/test_datasets/run.py",
@@ -122,10 +128,7 @@ def test_saas_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> No
             "--pct-derived-both-sides",
             "0.7",
         ],
-        check=True,
         cwd=repo_root,
-        capture_output=True,
-        text=True,
     )
 
     saas_dir = out_root / "saas"
