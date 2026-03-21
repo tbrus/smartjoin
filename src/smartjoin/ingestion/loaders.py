@@ -83,11 +83,66 @@ def _normalize_pandas_frame(frame: Any) -> pl.DataFrame:
     return pl.DataFrame(normalized, strict=False)
 
 
+def _load_xlsx_openpyxl(
+    path: Path, sheet_name: str | None = None
+) -> list[tuple[str, pl.DataFrame]]:
+    """Fallback XLSX loader when pandas is unavailable."""
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:  # pragma: no cover - optional runtime dependency
+        raise ValueError("XLSX support requires pandas or openpyxl installed.") from exc
+
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    try:
+        if sheet_name is not None:
+            if sheet_name not in workbook.sheetnames:
+                raise ValueError(f"Sheet '{sheet_name}' not found in {path.name}.")
+            selected = [sheet_name]
+        else:
+            selected = list(workbook.sheetnames)
+
+        frames: list[tuple[str, pl.DataFrame]] = []
+        for current_sheet in selected:
+            worksheet = workbook[current_sheet]
+            rows = list(worksheet.iter_rows(values_only=True))
+            if not rows:
+                frames.append((str(current_sheet), pl.DataFrame()))
+                continue
+
+            raw_headers = list(rows[0])
+            headers: list[str] = []
+            seen: dict[str, int] = {}
+            for index, header in enumerate(raw_headers):
+                token = str(header).strip() if header is not None else ""
+                base = token or f"column_{index + 1}"
+                occurrence = seen.get(base, 0)
+                seen[base] = occurrence + 1
+                headers.append(base if occurrence == 0 else f"{base}_{occurrence + 1}")
+
+            body = rows[1:]
+            records: list[dict[str, Any]] = []
+            for row in body:
+                values = list(row[: len(headers)])
+                if len(values) < len(headers):
+                    values.extend([None] * (len(headers) - len(values)))
+                records.append({key: values[idx] for idx, key in enumerate(headers)})
+
+            if records:
+                frame = pl.from_dicts(records)
+            else:
+                frame = pl.DataFrame({header: [] for header in headers})
+            frames.append((str(current_sheet), frame))
+
+        return frames
+    finally:
+        workbook.close()
+
+
 def _load_xlsx(path: Path, sheet_name: str | None = None) -> list[tuple[str, pl.DataFrame]]:
     try:
         import pandas as pd
-    except ImportError as exc:  # pragma: no cover - handled via runtime dependency
-        raise ValueError("XLSX support requires pandas/openpyxl installed.") from exc
+    except ImportError:
+        return _load_xlsx_openpyxl(path, sheet_name=sheet_name)
 
     # No explicit sheet means read all workbook sheets.
     target_sheet: str | None = sheet_name if sheet_name is not None else None

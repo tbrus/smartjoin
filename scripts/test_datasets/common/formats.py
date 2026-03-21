@@ -6,10 +6,21 @@ import json
 from pathlib import Path
 from typing import Final
 
-import pandas as pd
 import polars as pl
 
 TARGET_NON_CSV_EXTENSIONS: Final[tuple[str, ...]] = (".parquet", ".json", ".xlsx")
+
+
+def _read_csv_for_conversion(path: Path) -> pl.DataFrame:
+    """Read CSV with a resilient fallback for stricter parser versions."""
+    try:
+        return pl.read_csv(path, infer_schema_length=1000)
+    except Exception:
+        try:
+            return pl.read_csv(path, infer_schema=False)
+        except TypeError:
+            # Older Polars versions may not expose `infer_schema`.
+            return pl.read_csv(path, infer_schema_length=0)
 
 
 def _read_manifest(path: Path) -> dict:
@@ -50,12 +61,27 @@ def _write_json(path: Path, frame: pl.DataFrame) -> None:
 
 
 def _write_xlsx(path: Path, frame: pl.DataFrame) -> None:
+    try:
+        import pandas as pd
+    except ImportError:
+        # Fallback path keeps conversion available even without pandas.
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Data"
+        worksheet.append(list(frame.columns))
+        for row in frame.iter_rows():
+            worksheet.append(list(row))
+        workbook.save(path)
+        return
+
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         pd.DataFrame(frame.to_dicts()).to_excel(writer, index=False, sheet_name="Data")
 
 
 def _convert_csv(path: Path, target_ext: str) -> Path:
-    frame = pl.read_csv(path, infer_schema_length=1000)
+    frame = _read_csv_for_conversion(path)
     out_path = path.with_suffix(target_ext)
     if out_path.exists():
         out_path.unlink()

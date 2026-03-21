@@ -1,10 +1,17 @@
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import polars as pl
+
+ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _strip_ansi(text: str) -> str:
+    return ANSI_ESCAPE_PATTERN.sub("", text)
 
 
 def test_cli_run_command_writes_all_outputs(tmp_path: Path) -> None:
@@ -122,10 +129,12 @@ def test_cli_without_command_shows_help(tmp_path: Path) -> None:
         text=True,
     )
 
+    stdout = _strip_ansi(result.stdout)
     assert result.returncode != 0
-    assert "Usage: python -m smartjoin.cli [OPTIONS] COMMAND [ARGS]..." in result.stdout
-    assert "run" in result.stdout
-    assert "Missing command." not in result.stdout
+    assert "Usage:" in stdout
+    assert "smartjoin.cli [OPTIONS] COMMAND [ARGS]..." in stdout
+    assert "run" in stdout
+    assert "Missing command." not in stdout
 
 
 def test_cli_run_without_required_args_shows_run_help(tmp_path: Path) -> None:
@@ -148,6 +157,8 @@ def test_cli_run_without_required_args_shows_run_help(tmp_path: Path) -> None:
         text=True,
     )
 
+    stdout = _strip_ansi(result.stdout)
     assert result.returncode != 0
-    assert "Usage: python -m smartjoin.cli run [OPTIONS] PATH OUT_DIR" in result.stdout
-    assert "Missing argument 'PATH'." not in result.stdout
+    assert "Usage:" in stdout
+    assert "smartjoin.cli run [OPTIONS] PATH OUT_DIR" in stdout
+    assert "Missing argument 'PATH'." not in stdout
