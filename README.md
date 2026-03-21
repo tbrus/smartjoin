@@ -58,6 +58,8 @@ Please keep in mind:
 - output quality depends on the quality, consistency, and structure of the input data
 - the tool is intended for structured dataset analysis, not as a general-purpose data processing platform
 
+Currently supported input formats include: `.csv`, `.xlsx`, `.json`, `.parquet`.
+
 ## Roadmap
 
 Future development may include:
