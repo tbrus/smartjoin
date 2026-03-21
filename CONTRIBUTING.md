@@ -21,6 +21,8 @@ For larger changes, opening an issue first is recommended.
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+pre-commit install
+pre-commit install --hook-type pre-push
 ```
 
 On Windows PowerShell:
@@ -29,6 +31,8 @@ On Windows PowerShell:
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
+pre-commit install
+pre-commit install --hook-type pre-push
 ```
 
 ## Running tests and checks
@@ -38,13 +42,19 @@ Before opening a pull request, please run:
 ```bash
 pytest
 ruff check .
-black --check .
+ruff format --check .
 ```
 
 If formatting changes are needed, run:
 
 ```bash
-black .
+ruff format .
+```
+
+You can also run all configured hooks manually:
+
+```bash
+pre-commit run --all-files
 ```
 
 ## Pull requests
