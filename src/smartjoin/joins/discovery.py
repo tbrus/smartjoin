@@ -227,9 +227,8 @@ def _is_categorical(sig: ColumnSignature, distinct_low_card_threshold: int) -> b
     distinct_ratio = sig.distinct_count / sig.row_count
     if sig.distinct_count <= distinct_low_card_threshold:
         return True
-    return (
-        distinct_ratio <= 0.02
-        and sig.distinct_count <= max(256, distinct_low_card_threshold * 4)
+    return distinct_ratio <= 0.02 and sig.distinct_count <= max(
+        256, distinct_low_card_threshold * 4
     )
 
 
@@ -284,6 +283,7 @@ def _build_table_identifier_winners(
     This suppresses alternate ID abbreviations when a clearer
     canonical key exists in the same table.
     """
+
     def _entity_core_compatible_text(left_core: str, right_core: str) -> bool:
         left = left_core.strip().lower()
         right = right_core.strip().lower()
@@ -418,9 +418,11 @@ def _spurious_guard(
     )
     if same_specific_code_domain:
         return canonical_penalty
-    if not is_date_pair and _is_categorical(
-        fk, distinct_low_card_threshold
-    ) and _is_categorical(pk, distinct_low_card_threshold):
+    if (
+        not is_date_pair
+        and _is_categorical(fk, distinct_low_card_threshold)
+        and _is_categorical(pk, distinct_low_card_threshold)
+    ):
         return 0.0
     fk_identifier = _is_identifier(fk)
     pk_identifier = _is_identifier(pk)
@@ -431,12 +433,7 @@ def _spurious_guard(
         and pk.sampled_distinct_count <= 20
     ):
         return 0.0
-    if (
-        not fk_identifier
-        and not pk_identifier
-        and fk_ratio <= 0.05
-        and pk_ratio <= 0.05
-    ):
+    if not fk_identifier and not pk_identifier and fk_ratio <= 0.05 and pk_ratio <= 0.05:
         return 0.0
     if (
         not fk_identifier
@@ -458,19 +455,13 @@ def _detect_bridge_tables(
     """
     bridges: set[str] = set()
     for table in tables:
-        id_cols = [
-            col
-            for col in table.df.columns
-            if _is_identifier(signatures[(table.name, col)])
-        ]
+        id_cols = [col for col in table.df.columns if _is_identifier(signatures[(table.name, col)])]
         if len(id_cols) < 2:
             continue
 
         # Prefer plausible FK-like id columns that are not individually unique.
         fk_like = [
-            col
-            for col in id_cols
-            if 0.05 <= signatures[(table.name, col)].uniqueness_ratio < 0.98
+            col for col in id_cols if 0.05 <= signatures[(table.name, col)].uniqueness_ratio < 0.98
         ]
         if len(fk_like) < 2:
             continue
@@ -509,9 +500,8 @@ def _date_signal_and_cap(
         return 1.0, 1.0, None
 
     # Surrogate keys such as `date_key` should not be treated as raw temporal overlaps.
-    if (
-        (fk.name_features.key_like or fk.name_features.id_like)
-        and (pk.name_features.key_like or pk.name_features.id_like)
+    if (fk.name_features.key_like or fk.name_features.id_like) and (
+        pk.name_features.key_like or pk.name_features.id_like
     ):
         return 1.0, 1.0, None
 
@@ -892,8 +882,7 @@ def _dedupe_temporal_equivalent_targets(
         for candidate in ordered:
             candidate_pk = signatures[(candidate.right_table, candidate.right_column)]
             equivalent_to_kept = any(
-                _temporal_signature_equivalent(candidate_pk, kept_pk)
-                for kept_pk in kept_right_sigs
+                _temporal_signature_equivalent(candidate_pk, kept_pk) for kept_pk in kept_right_sigs
             )
             if equivalent_to_kept:
                 continue
@@ -1700,9 +1689,7 @@ def find_join_candidates(
         min(
             1.0,
             float(
-                min_confidence
-                if retention_confidence_floor is None
-                else retention_confidence_floor
+                min_confidence if retention_confidence_floor is None else retention_confidence_floor
             ),
         ),
     )
@@ -1829,13 +1816,10 @@ def find_join_candidates(
                         pair_candidates.append(direct_candidate)
 
                 name_similarity = _name_similarity(left_sig, right_sig)
-                can_try_derived = (
-                    bool(derived_rank_index)
-                    and _derived_pair_prefilter(
-                        left_sig=left_sig,
-                        right_sig=right_sig,
-                        name_similarity=name_similarity,
-                    )
+                can_try_derived = bool(derived_rank_index) and _derived_pair_prefilter(
+                    left_sig=left_sig,
+                    right_sig=right_sig,
+                    name_similarity=name_similarity,
                 )
                 if can_try_derived:
                     left_variants = _get_or_build_derived_variants(

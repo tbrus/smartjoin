@@ -92,4 +92,3 @@ def derive_prefixed_numeric(
     if style == "space_dash":
         return f" {prefix.lower()}-{digits} "
     raise ValueError(f"Unsupported derived style: {style}")
-

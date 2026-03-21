@@ -140,4 +140,3 @@ def test_saas_blends_one_sided_and_both_sided_derived_keys(tmp_path: Path) -> No
     refund_payment_ids = _read_table_column(saas_dir, "refunds", "payment_id")
     assert _contains_derived_pattern(payment_ids)
     assert _contains_derived_pattern(refund_payment_ids)
-

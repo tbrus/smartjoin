@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import re
-from difflib import SequenceMatcher
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from difflib import SequenceMatcher
+from typing import Any
 
 import polars as pl
 
@@ -67,7 +68,9 @@ class DerivedBudgets:
     min_prefix_hits: int = 3
 
     def resolved_transform_cap(self) -> int:
-        hard_cap = max(1, min(int(self.max_transforms_per_column), int(self.max_variants_per_column)))
+        hard_cap = max(
+            1, min(int(self.max_transforms_per_column), int(self.max_variants_per_column))
+        )
         return hard_cap
 
 

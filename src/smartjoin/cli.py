@@ -61,18 +61,10 @@ def _parse_float_assignments_csv(raw: str | None, label: str) -> dict[str, float
 def _write_relationship_metrics_table(report: AnalysisReport, out_path: Path) -> None:
     """Write discovered relationships and scoring metrics as a flat CSV table."""
     signal_keys = sorted(
-        {
-            signal_name
-            for join in report.joins
-            for signal_name in join.breakdown.signals.keys()
-        }
+        {signal_name for join in report.joins for signal_name in join.breakdown.signals.keys()}
     )
     weight_keys = sorted(
-        {
-            weight_name
-            for join in report.joins
-            for weight_name in join.breakdown.weights.keys()
-        }
+        {weight_name for join in report.joins for weight_name in join.breakdown.weights.keys()}
     )
 
     base_columns = [

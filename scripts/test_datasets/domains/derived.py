@@ -1,4 +1,4 @@
-﻿"""Generate small focused regression datasets for derived-key join behavior."""
+"""Generate small focused regression datasets for derived-key join behavior."""
 
 from __future__ import annotations
 
@@ -438,4 +438,3 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

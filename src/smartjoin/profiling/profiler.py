@@ -107,11 +107,7 @@ def profile_table(
                 distinct_count=int(distinct_count),
                 unique_ratio=float(unique_ratio),
                 near_unique=near_unique,
-                entropy=(
-                    _entropy(series, value_cap=entropy_value_cap)
-                    if compute_entropy
-                    else 0.0
-                ),
+                entropy=(_entropy(series, value_cap=entropy_value_cap) if compute_entropy else 0.0),
                 sample_values=_sample_values(series=series, max_values=sample_values_limit),
                 min_value=min_value,
                 max_value=max_value,

@@ -1,4 +1,4 @@
-﻿"""Generate deterministic, join-heavy test datasets for Smartjoin."""
+"""Generate deterministic, join-heavy test datasets for Smartjoin."""
 
 from __future__ import annotations
 
@@ -827,5 +827,3 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-
-

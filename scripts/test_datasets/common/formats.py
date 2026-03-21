@@ -127,4 +127,3 @@ def apply_mixed_table_formats(out_dir: Path) -> dict[str, str]:
 
     _rewrite_manifest_core_table_files(manifest_path, table_files)
     return table_files
-

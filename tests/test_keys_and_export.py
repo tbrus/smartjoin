@@ -33,4 +33,3 @@ def test_discover_keys_finds_primary_and_composite_candidates() -> None:
         candidate.columns == ["order_id", "line_no"]
         for candidate in by_table["order_items"].composite_key_candidates
     )
-

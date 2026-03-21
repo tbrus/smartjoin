@@ -120,9 +120,7 @@ def _build_name_features(column_name: str) -> NameFeatures:
         return normalized_token
 
     entity_core = "".join(
-        _normalize_entity_token(token)
-        for token in tokens
-        if token not in qualifier_tokens
+        _normalize_entity_token(token) for token in tokens if token not in qualifier_tokens
     )
     date_tokens = {
         "date",

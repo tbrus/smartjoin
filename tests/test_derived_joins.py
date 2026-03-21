@@ -285,10 +285,7 @@ def test_noncanonical_alias_edge_is_suppressed_when_canonical_exists() -> None:
         df=pl.DataFrame(
             {
                 "account_id": [f"ACC{i:06d}" for i in range(1, 121)],
-                "acct_id": [
-                    f"ACC{i:06d}" if i % 7 else f"ACT{i:06d}"
-                    for i in range(1, 121)
-                ],
+                "acct_id": [f"ACC{i:06d}" if i % 7 else f"ACT{i:06d}" for i in range(1, 121)],
             }
         ),
     )
@@ -397,12 +394,8 @@ def test_derived_ambiguity_ignores_non_key_competing_columns() -> None:
         df=pl.DataFrame(
             {
                 "product_id": [f"prd{((i - 1) % 3) + 1:05d}" for i in range(1, 31)],
-                "status_text_a": [
-                    f"prd{((i - 1) % 2) + 1:05d}" for i in range(1, 31)
-                ],
-                "status_text_b": [
-                    f"prd{((i + 0) % 2) + 1:05d}" for i in range(1, 31)
-                ],
+                "status_text_a": [f"prd{((i - 1) % 2) + 1:05d}" for i in range(1, 31)],
+                "status_text_b": [f"prd{((i + 0) % 2) + 1:05d}" for i in range(1, 31)],
             }
         ),
     )

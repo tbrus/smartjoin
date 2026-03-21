@@ -12,6 +12,5 @@ def test_transform_description_known_transforms() -> None:
 
 def test_transform_description_unknown_transform_is_deterministic() -> None:
     assert (
-        transform_description("custom_transform", {"b": 2, "a": 1})
-        == "Custom transform (a=1, b=2)"
+        transform_description("custom_transform", {"b": 2, "a": 1}) == "Custom transform (a=1, b=2)"
     )

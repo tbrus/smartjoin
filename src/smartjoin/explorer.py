@@ -207,8 +207,7 @@ def _build_payload(
         right_table = join.get("right_table")
         right_column = join.get("right_column")
         if not all(
-            isinstance(item, str)
-            for item in [left_table, left_column, right_table, right_column]
+            isinstance(item, str) for item in [left_table, left_column, right_table, right_column]
         ):
             continue
         left = table_by_name.get(left_table)

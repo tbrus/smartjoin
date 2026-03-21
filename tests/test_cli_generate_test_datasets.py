@@ -185,4 +185,3 @@ def test_cli_generate_test_datasets_derived_domain(tmp_path: Path) -> None:
     )
     generated_domains = [item["domain"] for item in generation_manifest["domains"]]
     assert generated_domains == ["derived"]
-
