@@ -23,5 +23,3 @@ html/
 /scripts/test_datasets/**/__pycache__/
 /scripts/test_datasets/**/*.py[cod]
 
-# Local helper not meant for VCS
-/scripts/test_datasets/common/manifest.py
