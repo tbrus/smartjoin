@@ -5,7 +5,7 @@
 # smartjoin: data relationship discovery in seconds
 
 [![License](https://img.shields.io/github/license/tbrus/smartjoin)](https://github.com/tbrus/smartjoin)
-[![PyPI](https://img.shields.io/pypi/v/smartjoin)](https://pypi.org/project/smartjoin/)
+[![PyPI](https://img.shields.io/pypi/v/smartjoin-py)](https://pypi.org/project/smartjoin-py/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![Code style](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/psf/black)
 
@@ -21,7 +21,7 @@ smartjoin helps by **scanning** structured datasets, **identifying candidate rel
 ### Installation
 
 ```bash
-pip install smartjoin
+pip install smartjoin-py
 ```
 
 ### Run

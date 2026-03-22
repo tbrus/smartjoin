@@ -3,7 +3,7 @@ requires = ["hatchling>=1.24.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "smartjoin"
+name = "smartjoin-py"
 version = "0.1.0"
 description = "Deterministic relationship discovery for structured datasets."
 readme = "README.md"
