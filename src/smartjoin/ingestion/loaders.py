@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 from pathlib import Path
@@ -13,6 +14,7 @@ from smartjoin.models import Table
 
 SUPPORTED_EXTENSIONS = {".csv", ".parquet", ".xlsx", ".json"}
 DEFAULT_EXCLUDED_STEMS = {"manifest", "report", "graph"}
+CSV_SEPARATOR_CANDIDATES = (",", ";", "\t", "|")
 
 
 def _flatten_dict(payload: dict[str, Any], max_depth: int = 1, prefix: str = "") -> dict[str, Any]:
@@ -53,13 +55,57 @@ def discover_data_files(path: Path, max_tables: int | None = None) -> list[Path]
     return files
 
 
-def _load_csv(path: Path) -> pl.DataFrame:
+def _read_text_sample(path: Path, size: int = 65_536) -> str:
+    with path.open("rb") as handle:
+        payload = handle.read(size)
+    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            return payload.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return payload.decode("utf-8", errors="ignore")
+
+
+def _detect_csv_separator(path: Path) -> str:
+    sample = _read_text_sample(path)
+    if not sample.strip():
+        return ","
+
     try:
-        return pl.read_csv(path, infer_schema_length=1000)
+        dialect = csv.Sniffer().sniff(sample, delimiters="".join(CSV_SEPARATOR_CANDIDATES))
+        if dialect.delimiter in CSV_SEPARATOR_CANDIDATES:
+            return dialect.delimiter
+    except csv.Error:
+        pass
+
+    lines = [line for line in sample.splitlines() if line.strip()]
+    if not lines:
+        return ","
+    lines = lines[:20]
+
+    best_delimiter = ","
+    best_score = (-1, -1.0)
+    for delimiter in CSV_SEPARATOR_CANDIDATES:
+        counts = [line.count(delimiter) for line in lines]
+        nonzero = [count for count in counts if count > 0]
+        if len(nonzero) < 2:
+            continue
+        average = sum(nonzero) / len(nonzero)
+        score = (len(nonzero), average)
+        if score > best_score:
+            best_score = score
+            best_delimiter = delimiter
+    return best_delimiter
+
+
+def _load_csv(path: Path) -> pl.DataFrame:
+    separator = _detect_csv_separator(path)
+    try:
+        return pl.read_csv(path, infer_schema_length=1000, separator=separator)
     except pl.exceptions.ComputeError:
         # Fallback for late type changes (for example: ints early, floats later).
         # Full-file inference is slower, so we only do this when needed.
-        return pl.read_csv(path, infer_schema_length=None)
+        return pl.read_csv(path, infer_schema_length=None, separator=separator)
 
 
 def _load_parquet(path: Path) -> pl.DataFrame:
