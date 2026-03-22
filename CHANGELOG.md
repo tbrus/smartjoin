@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Placeholder for upcoming fixes.
 
+## [0.1.1] - 2026-03-22
+
+### Changed
+- Bundled test dataset generator scripts into the installed package so `smartjoin generate-test-datasets` works outside a source checkout.
+
+### Fixed
+- Fixed installed CLI error: `Test dataset generators are unavailable: scripts/test_datasets/run.py is missing.`
+- Added loader fallback in CLI to use bundled dataset generators when source-tree scripts are not present.
+
 ## [0.1.0] - 2026-03-22
 
 ### Added
