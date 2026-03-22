@@ -12,6 +12,16 @@ license = { text = "MIT" }
 authors = [
     {name = "tbrus", email = "brus.tomasz@outlook.com"}
 ]
+keywords = ["data", "joins", "schema", "discovery", "relationships", "datasets"]
+classifiers = [
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Operating System :: OS Independent",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
   "polars>=1.10.0",
   "pandas>=2.2.0",
@@ -29,6 +39,8 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/tbrus/smartjoin"
+Repository = "https://github.com/tbrus/smartjoin"
+Issues = "https://github.com/tbrus/smartjoin/issues"
 
 [project.scripts]
 smartjoin = "smartjoin.cli:main"
