@@ -54,7 +54,12 @@ def discover_data_files(path: Path, max_tables: int | None = None) -> list[Path]
 
 
 def _load_csv(path: Path) -> pl.DataFrame:
-    return pl.read_csv(path, infer_schema_length=1000)
+    try:
+        return pl.read_csv(path, infer_schema_length=1000)
+    except pl.exceptions.ComputeError:
+        # Fallback for late type changes (for example: ints early, floats later).
+        # Full-file inference is slower, so we only do this when needed.
+        return pl.read_csv(path, infer_schema_length=None)
 
 
 def _load_parquet(path: Path) -> pl.DataFrame:
