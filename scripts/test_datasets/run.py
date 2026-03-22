@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import shutil
 import sys
@@ -11,6 +12,10 @@ from pathlib import Path
 if __package__ in {None, ""}:
     # Allow `python scripts/test_datasets/run.py` to import `test_datasets.*`.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+else:
+    # Allow imports written against `test_datasets.*` to work when this
+    # module is bundled under `smartjoin._bundled_test_datasets`.
+    sys.modules.setdefault("test_datasets", importlib.import_module(__package__))
 
 from test_datasets.common import apply_mixed_table_formats
 from test_datasets.domains import derived, health, retail, saas

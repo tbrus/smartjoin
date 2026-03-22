@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import importlib
 import importlib.util
 from pathlib import Path
 from typing import Annotated, Literal
@@ -117,19 +118,23 @@ def _write_relationship_metrics_table(report: AnalysisReport, out_path: Path) ->
 
 
 def _load_test_dataset_runner() -> object:
-    """Load scripts/test_datasets/run.py directly to avoid import-path conflicts."""
+    """Load dataset generator runner from source checkout or bundled package."""
     repo_root = Path(__file__).resolve().parents[2]
     run_path = repo_root / "scripts" / "test_datasets" / "run.py"
-    if not run_path.exists():
+    if run_path.exists():
+        spec = importlib.util.spec_from_file_location("smartjoin_test_datasets_run", run_path)
+        if spec is None or spec.loader is None:
+            raise typer.BadParameter(f"Unable to load dataset runner module: {run_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    try:
+        return importlib.import_module("smartjoin._bundled_test_datasets.run")
+    except ModuleNotFoundError as exc:
         raise typer.BadParameter(
             "Test dataset generators are unavailable: scripts/test_datasets/run.py is missing."
-        )
-    spec = importlib.util.spec_from_file_location("smartjoin_test_datasets_run", run_path)
-    if spec is None or spec.loader is None:
-        raise typer.BadParameter(f"Unable to load dataset runner module: {run_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+        ) from exc
 
 
 @app.callback()
