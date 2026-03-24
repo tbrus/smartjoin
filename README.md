@@ -1,6 +1,9 @@
 <h1 align="center">
-  <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/logo-v1.png" height="42" style="vertical-align: middle; margin-right: 10px;">
-  <span style="vertical-align: middle;">smartjoin</span>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/logo-dark-v1.png" height="42">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/logo-light-v1.png" height="42">
+    <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/logo-v1.png" height="42">
+  </picture>
 </h1>
 <p align="center"><em>Data relationship discovery in seconds</em></p>
 
