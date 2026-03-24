@@ -27,6 +27,32 @@ def test_load_tables_supports_csv_parquet_and_json(tmp_path: Path) -> None:
     assert "meta__status" in by_name["c"].df.columns
 
 
+def test_load_tables_detects_semicolon_csv_separator(tmp_path: Path) -> None:
+    csv_path = tmp_path / "semi.csv"
+    csv_path.write_text("id;name\n1;alpha\n2;bravo\n", encoding="utf-8")
+
+    tables = load_tables(tmp_path)
+    by_name = {table.name: table for table in tables}
+
+    assert "semi" in by_name
+    assert by_name["semi"].df.columns == ["id", "name"]
+    assert by_name["semi"].df.to_dicts() == [{"id": 1, "name": "alpha"}, {"id": 2, "name": "bravo"}]
+
+
+def test_load_tables_csv_with_late_float_value_falls_back_to_full_inference(tmp_path: Path) -> None:
+    csv_path = tmp_path / "late_types.csv"
+    lines = ["Turbo standard", *[str(index) for index in range(1000)], "1957.5"]
+    csv_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    tables = load_tables(tmp_path)
+    by_name = {table.name: table for table in tables}
+
+    assert "late_types" in by_name
+    values = by_name["late_types"].df["Turbo standard"].to_list()
+    assert len(values) == 1001
+    assert float(values[-1]) == pytest.approx(1957.5)
+
+
 def test_load_tables_supports_xlsx(tmp_path: Path) -> None:
     pd = pytest.importorskip("pandas")
     pytest.importorskip("openpyxl")
