@@ -27,7 +27,7 @@ It scans structured data, profiles columns, discovers likely keys, infers candid
 Supports `.csv`, `.xlsx`, `.json`, `.parquet` input files.
 
 <span align="center">
-  <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/explorer_preview.png">
+  <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/demo.gif">
 </span>
 
 ## Example
