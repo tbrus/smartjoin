@@ -5,9 +5,9 @@
     <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/logo-v1.png" height="42">
   </picture>
 </h1>
-<p align="center"><em>Data relationship discovery in seconds</em></p>
+<p align="center"><em>Stop guessing how your tables connect</em></p>
 
-<p align="center">
+<span align="center">
 
 [![License](https://img.shields.io/github/license/tbrus/smartjoin)](https://github.com/tbrus/smartjoin)
 [![PyPI](https://img.shields.io/pypi/v/smartjoin-py)](https://pypi.org/project/smartjoin-py/)
@@ -16,15 +16,36 @@
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-Ruff-0F172A?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
 ![Formats: CSV, XLSX, JSON, Parquet](https://img.shields.io/badge/Formats-CSV%20%7C%20XLSX%20%7C%20JSON%20%7C%20Parquet-3FAF6C)
 
-</p>
+</span>
 
 ---
-Stop guessing how your tables connect - **smartjoin automatically discovers relationships between structured datasets** — no schema, no docs, no manual SQL detective work.
 
-When working with unfamiliar datasets, one of the hardest problems is understanding how files relate to each other.
+**smartjoin** helps you understand how unfamiliar datasets fit together — without schema docs, manual SQL detective work, or opaque guesses.
 
-smartjoin helps by **scanning** structured datasets, **identifying candidate relationships**, producing **explainable outputs** instead of opaque guesses and giving you an **explorer to inspect and review the results**.
+It scans structured data, profiles columns, discovers likely keys, infers candidate joins, and generates an interactive explorer so you can inspect the results.
 
+Supports `.csv`, `.xlsx`, `.json`, `.parquet` input files.
+
+<span align="center">
+  <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/explorer_preview.png">
+</span>
+
+## Example
+
+Given a folder like:
+
+- `orders.csv`
+- `customers.xlsx`
+- `payments.parquet`
+- `shipments.json`
+
+smartjoin can infer relationships such as:
+
+| Source                | Target            | Type          | Confidence  | Origin     |
+| --------------------- | ----------------- | ------------- | ----------- | ---------- |
+| `orders.customer_id`  | `customers.id`    | `many_to_one` | `98%`       | `Direct`   |
+| `payments.order_id`   | `orders.order_id` | `many_to_one` | `95%`       | `Derived`  |
+| `shipments.order_ref` | `orders.order_id` | `one_to_one`  | `89%`       | `Direct`   |
 
 ## Quickstart
 
@@ -35,40 +56,33 @@ pip install smartjoin-py
 ```
 
 ### Run
+
 ```bash
 smartjoin run <path> <out_dir>
 ```
+
 This analyzes the structured datasets in `<path>` and writes results to `<out_dir>`.
 
-### Generate test datasets
+### Outputs
 
-To explore how smartjoin works, you can generate synthethic test datasets:
+- `report.json` — full structured analysis output
+- `relationships.csv` — flat table of discovered joins and scoring signals
+- `explorer/index.html` — interactive explorer UI
+- `explorer/data.json` — explorer payload
+
+## Generate demo datasets
+
+To explore smartjoin on deterministic synthetic data:
 
 ```bash
 smartjoin generate-test-datasets --output-dir <output-dir>
 ```
 
-## Explorer
-
-In addition to the output files, smartjoin generates an interactive HTML-based explorer that helps you inspect detected relationships visually.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/explorer_preview.png">
-</p>
-
-
 ## Limitations
 
-smartjoin identifies candidate relationships across structured datasets. It **does not** guarantee semantic correctness.
+smartjoin identifies **candidate relationships** across structured datasets. It **does not** guarantee semantic correctness.
 
-Please keep in mind:
-
-- inferred relationships should be reviewed before being relied on downstream
-- domain-specific meaning may still require human interpretation
-- output quality depends on the quality, consistency, and structure of the input data
-- the tool is intended for structured dataset analysis, not as a general-purpose data processing platform
-
-Currently supported input formats include: `.csv`, `.xlsx`, `.json`, `.parquet`.
+Always review inferred joins before using them downstream. Domain meaning may still require human interpretation, and output quality depends on the structure and consistency of the input data.
 
 ## Roadmap
 
