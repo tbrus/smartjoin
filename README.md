@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/logo.png" height="42" style="vertical-align: middle; margin-right: 10px;">
+  <img src="https://raw.githubusercontent.com/tbrus/smartjoin/main/docs/logo-v1.png" height="42" style="vertical-align: middle; margin-right: 10px;">
   <span style="vertical-align: middle;">smartjoin</span>
 </h1>
 <p align="center"><em>Data relationship discovery in seconds</em></p>
