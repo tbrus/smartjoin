@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smartjoin-py"
-version = "0.1.1"
+version = "0.1.2"
 description = "Deterministic key and join discovery for structured datasets."
 readme = "README.md"
 requires-python = ">=3.11"

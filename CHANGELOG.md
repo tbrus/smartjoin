@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Placeholder for upcoming fixes.
 
+## [0.1.2] - 2026-03-25
+
+### Added
+- Separator sniffer for csv loader.
+
+### Fixed
+- `infer_schema_length` parameter fallback when loading csv files - when schema is not inferred properly based on the sample, full csv content is loaded to infer it properly.
+
 ## [0.1.1] - 2026-03-22
 
 ### Changed
